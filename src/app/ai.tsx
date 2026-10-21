@@ -1,244 +1,223 @@
 import { useRouter } from "expo-router";
 import {
+  AlertCircle,
   Award,
   BrainCircuit,
   Calendar,
+  Camera,
   ChevronLeft,
   Droplets,
-  FlaskConical,
   Layers,
+  RefreshCw,
+  RotateCcw,
   ShieldCheck,
   Sparkles,
   Sprout,
-  Thermometer,
-  TrendingUp,
   Wrench,
 } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  Dimensions,
-  LayoutChangeEvent,
+  ActivityIndicator,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   View,
 } from "react-native";
 
-
 import { GlassCard } from "@/components/ui/glass-card";
 import { MeshBackground } from "@/components/ui/mesh-background";
+import { Skeleton } from "@/components/ui/skeleton";
 import { SafeAreaView } from "@/components/ui/styled";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useSettings } from "@/hooks/use-settings";
+import { useToast } from "@/hooks/use-toast";
+import { fetchSoilAiAnalysis } from "@/services/soil-data";
+import { SoilAiAnalysis } from "@/types/soil";
 
-type MetricType = "ph" | "moisture" | "temperature";
-
-interface MetricConfig {
-  id: MetricType;
-  label: string;
-  unit: string;
-  color: string;
-  accentBg: string;
-  icon: React.ComponentType<{ size?: number; color?: string }>;
-  minY: number;
-  maxY: number;
-  data: { day: string; value: number; date: string }[];
-  targetRange: string;
-  statusLabel: string;
-}
-
-const METRICS_DATA: Record<MetricType, MetricConfig> = {
-  ph: {
-    id: "ph",
-    label: "pH Tanah",
-    unit: "pH",
-    color: "#059669",
-    accentBg: "rgba(16, 185, 129, 0.15)",
-    icon: FlaskConical,
-    minY: 5.5,
-    maxY: 7.5,
-    targetRange: "6.0 - 7.0 pH",
-    statusLabel: "Netral Optimal",
-    data: [
-      { day: "Sen", value: 6.1, date: "5 Sep" },
-      { day: "Sel", value: 6.3, date: "6 Sep" },
-      { day: "Rab", value: 6.2, date: "7 Sep" },
-      { day: "Kam", value: 6.5, date: "8 Sep" },
-      { day: "Jum", value: 6.4, date: "9 Sep" },
-      { day: "Sab", value: 6.6, date: "10 Sep" },
-      { day: "Min", value: 6.5, date: "11 Sep" },
-    ],
-  },
-  moisture: {
-    id: "moisture",
-    label: "Kelembapan",
-    unit: "%",
-    color: "#0284C7",
-    accentBg: "rgba(2, 132, 199, 0.15)",
-    icon: Droplets,
-    minY: 40,
-    maxY: 90,
-    targetRange: "60% - 75%",
-    statusLabel: "Kadar Ideal",
-    data: [
-      { day: "Sen", value: 58, date: "5 Sep" },
-      { day: "Sel", value: 62, date: "6 Sep" },
-      { day: "Rab", value: 60, date: "7 Sep" },
-      { day: "Kam", value: 68, date: "8 Sep" },
-      { day: "Jum", value: 65, date: "9 Sep" },
-      { day: "Sab", value: 72, date: "10 Sep" },
-      { day: "Min", value: 68, date: "11 Sep" },
-    ],
-  },
-  temperature: {
-    id: "temperature",
-    label: "Suhu Tanah",
-    unit: "°C",
-    color: "#D97706",
-    accentBg: "rgba(217, 119, 6, 0.15)",
-    icon: Thermometer,
-    minY: 20,
-    maxY: 32,
-    targetRange: "24°C - 28°C",
-    statusLabel: "Suhu Normal",
-    data: [
-      { day: "Sen", value: 28.2, date: "5 Sep" },
-      { day: "Sel", value: 27.5, date: "6 Sep" },
-      { day: "Rab", value: 26.8, date: "7 Sep" },
-      { day: "Kam", value: 25.4, date: "8 Sep" },
-      { day: "Jum", value: 26.0, date: "9 Sep" },
-      { day: "Sab", value: 27.1, date: "10 Sep" },
-      { day: "Min", value: 26.4, date: "11 Sep" },
-    ],
-  },
-};
-
-const RECOMMENDED_CROPS = [
-  {
-    name: "Cabai Rawit",
-    latin: "Capsicum frutescens",
-    compatibility: 96,
-    badge: "Sangat Cocok",
-    badgeColor:
-      "text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/50 border-emerald-300 dark:border-emerald-700",
-    cycle: "75 - 85 Hari",
-    waterNeed: "Sedang",
-    reason:
-      "Toleransi optimal pada pH 6.0-6.8 dan kelembapan tanah 60-70%. Kondisi saat ini memicu diferensiasi bunga lebat.",
-  },
-  {
-    name: "Tomat Cherry",
-    latin: "Solanum lycopersicum var. cerasiforme",
-    compatibility: 93,
-    badge: "Sangat Cocok",
-    badgeColor:
-      "text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/50 border-emerald-300 dark:border-emerald-700",
-    cycle: "60 - 70 Hari",
-    waterNeed: "Tinggi",
-    reason:
-      "Kandungan kalium dan drainase tanah yang terukur mencegah keretakan buah (blossom end rot).",
-  },
-  {
-    name: "Jagung Manis",
-    latin: "Zea mays saccharata",
-    compatibility: 89,
-    badge: "Cocok",
-    badgeColor:
-      "text-teal-700 dark:text-teal-300 bg-teal-100 dark:bg-teal-950/50 border-teal-300 dark:border-teal-700",
-    cycle: "70 - 75 Hari",
-    waterNeed: "Sedang",
-    reason:
-      "Struktur tanah yang remah dengan pasokan nitrogen stabil mendukung pengisian tongkol sempurna.",
-  },
-  {
-    name: "Selada Keriting Hijau",
-    latin: "Lactuca sativa",
-    compatibility: 85,
-    badge: "Cocok",
-    badgeColor:
-      "text-teal-700 dark:text-teal-300 bg-teal-100 dark:bg-teal-950/50 border-teal-300 dark:border-teal-700",
-    cycle: "35 - 45 Hari",
-    waterNeed: "Tinggi",
-    reason:
-      "Suhu perakaran di kisaran 26°C mencegah tanaman mengalami pembungaan dini (bolting).",
-  },
-];
-
-const SOIL_QUALITY_PARAMS = [
-  {
-    label: "Bahan Organik (BO)",
-    value: "4.6%",
-    status: "Sangat Baik",
-    score: 92,
-    note: "Target > 3.0%",
-  },
-  {
-    label: "Kapasitas Tukar Kation (KTK)",
-    value: "23.4 meq",
-    status: "Tinggi",
-    score: 88,
-    note: "Retensi hara optimal",
-  },
-  {
-    label: "Nitrogen Tersedia (N)",
-    value: "0.38%",
-    status: "Optimal",
-    score: 86,
-    note: "Vegetatif subur",
-  },
-  {
-    label: "Fosfor Tersedia (P₂O₅)",
-    value: "24 ppm",
-    status: "Sedang",
-    score: 78,
-    note: "Cukup untuk perakaran",
-  },
-  {
-    label: "Kalium Dapat Dipertukarkan (K)",
-    value: "0.62 meq",
-    status: "Tinggi",
-    score: 90,
-    note: "Ketahanan penyakit",
-  },
-  {
-    label: "Kepadatan Lindak (Bulk Density)",
-    value: "1.18 g/cm³",
-    status: "Gembur",
-    score: 91,
-    note: "Aerasi akar prima",
-  },
-];
-
-function getControlPoint(
-  current: { x: number; y: number },
-  previous?: { x: number; y: number },
-  next?: { x: number; y: number },
-  reverse?: boolean,
-) {
-  const p = previous || current;
-  const n = next || current;
-  const smoothing = 0.2;
-  const opposedLine = {
-    length: Math.hypot(n.x - p.x, n.y - p.y),
-    angle: Math.atan2(n.y - p.y, n.x - p.x),
-  };
-  const angle = opposedLine.angle + (reverse ? Math.PI : 0);
-  const length = opposedLine.length * smoothing;
-  return {
-    x: current.x + Math.cos(angle) * length,
-    y: current.y + Math.sin(angle) * length,
-  };
-}
-
-function buildSmoothPath(points: { x: number; y: number }[]): string {
-  if (!points.length) return "";
-  let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
-  for (let i = 0; i < points.length - 1; i++) {
-    const cp1 = getControlPoint(points[i], points[i - 1], points[i + 1], false);
-    const cp2 = getControlPoint(points[i + 1], points[i], points[i + 2], true);
-    d += ` C ${cp1.x.toFixed(1)} ${cp1.y.toFixed(1)}, ${cp2.x.toFixed(1)} ${cp2.y.toFixed(1)}, ${points[i + 1].x.toFixed(1)} ${points[i + 1].y.toFixed(1)}`;
+function getCategoryIcon(category: string) {
+  switch (category?.toLowerCase()) {
+    case "aerasi":
+      return <Layers size={15} color="#059669" />;
+    case "pemupukan":
+      return <Sprout size={15} color="#059669" />;
+    case "drainase":
+      return <Droplets size={15} color="#0284C7" />;
+    case "patogen":
+      return <ShieldCheck size={15} color="#059669" />;
+    default:
+      return <Wrench size={15} color="#059669" />;
   }
-  return d;
+}
+
+function getCropBadgeStyle(compatibility: number, badgeColor?: string) {
+  if (badgeColor) return badgeColor;
+  if (compatibility >= 90) {
+    return "text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/50 border-emerald-300 dark:border-emerald-700";
+  }
+  return "text-teal-700 dark:text-teal-300 bg-teal-100 dark:bg-teal-950/50 border-teal-300 dark:border-teal-700";
+}
+
+function AiScreenSkeleton() {
+  return (
+    <View className="gap-4">
+      {/* Skeleton Card 1: Kesimpulan & Klasifikasi */}
+      <GlassCard
+        glowColor="#10B981"
+        contentClassName="p-4 rounded-[22px] gap-3"
+      >
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center gap-2 flex-1">
+            <Skeleton width={32} height={32} borderRadius={12} />
+            <View className="gap-1.5 flex-1">
+              <Skeleton width="60%" height={16} borderRadius={6} />
+              <Skeleton width="40%" height={10} borderRadius={4} />
+            </View>
+          </View>
+          <Skeleton width={70} height={24} borderRadius={12} />
+        </View>
+
+        {/* Highlight Klasifikasi Tanah */}
+        <Skeleton width="100%" height={42} borderRadius={14} />
+
+        {/* Narrative text lines */}
+        <View className="gap-2 pt-1">
+          <Skeleton width="100%" height={12} borderRadius={4} />
+          <Skeleton width="96%" height={12} borderRadius={4} />
+          <Skeleton width="92%" height={12} borderRadius={4} />
+          <Skeleton width="75%" height={12} borderRadius={4} />
+        </View>
+
+        {/* 5 Badges */}
+        <View className="flex-row flex-wrap gap-2 pt-1">
+          {[...Array(5)].map((_, i) => (
+            <View
+              key={i}
+              className="flex-1 min-w-[120px] p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5 gap-1.5"
+            >
+              <Skeleton width={55} height={10} borderRadius={4} />
+              <Skeleton width="80%" height={14} borderRadius={4} />
+            </View>
+          ))}
+        </View>
+      </GlassCard>
+
+      {/* Skeleton Card 2: Kualitas Tanah */}
+      <GlassCard
+        glowColor="#059669"
+        contentClassName="p-4 rounded-[22px] gap-3"
+      >
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center gap-2 flex-1">
+            <Skeleton width={32} height={32} borderRadius={12} />
+            <View className="gap-1.5 flex-1">
+              <Skeleton width="50%" height={16} borderRadius={6} />
+              <Skeleton width="65%" height={10} borderRadius={4} />
+            </View>
+          </View>
+          <View className="items-end gap-1">
+            <Skeleton width={50} height={26} borderRadius={6} />
+            <Skeleton width={60} height={10} borderRadius={4} />
+          </View>
+        </View>
+
+        {/* 6 Quality Parameters */}
+        <View className="gap-2 mt-1">
+          {[...Array(6)].map((_, i) => (
+            <View
+              key={i}
+              className="p-2.5 rounded-xl bg-white/70 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 gap-2"
+            >
+              <View className="flex-row justify-between items-center">
+                <View className="gap-1 flex-1 mr-2">
+                  <Skeleton width={130} height={12} borderRadius={4} />
+                  <Skeleton width={90} height={9} borderRadius={3} />
+                </View>
+                <View className="items-end gap-1">
+                  <Skeleton width={45} height={12} borderRadius={4} />
+                  <Skeleton width={55} height={10} borderRadius={4} />
+                </View>
+              </View>
+              <Skeleton width="100%" height={6} borderRadius={3} />
+            </View>
+          ))}
+        </View>
+      </GlassCard>
+
+      {/* Skeleton Card 3: Tanaman yang Cocok */}
+      <GlassCard
+        glowColor="#10B981"
+        contentClassName="p-4 rounded-[22px] gap-3"
+      >
+        <View className="flex-row items-center gap-2">
+          <Skeleton width={32} height={32} borderRadius={12} />
+          <View className="gap-1.5 flex-1">
+            <Skeleton width="55%" height={16} borderRadius={6} />
+            <Skeleton width="70%" height={10} borderRadius={4} />
+          </View>
+        </View>
+
+        <View className="gap-2.5 mt-1">
+          {[...Array(3)].map((_, i) => (
+            <View
+              key={i}
+              className="p-3 rounded-2xl bg-white/70 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 gap-2.5"
+            >
+              <View className="flex-row justify-between items-start">
+                <View className="gap-1 flex-1 mr-2">
+                  <Skeleton width={110} height={15} borderRadius={4} />
+                  <Skeleton width={80} height={10} borderRadius={3} />
+                </View>
+                <Skeleton width={90} height={20} borderRadius={10} />
+              </View>
+              <View className="gap-1.5">
+                <Skeleton width="100%" height={11} borderRadius={3} />
+                <Skeleton width="90%" height={11} borderRadius={3} />
+              </View>
+              <View className="flex-row gap-4 pt-1 border-t border-black/5 dark:border-white/5">
+                <Skeleton width={80} height={12} borderRadius={4} />
+                <Skeleton width={70} height={12} borderRadius={4} />
+              </View>
+            </View>
+          ))}
+        </View>
+      </GlassCard>
+
+      {/* Skeleton Card 4: Rekomendasi Perawatan */}
+      <GlassCard
+        glowColor="#10B981"
+        contentClassName="p-4 rounded-[22px] gap-3"
+      >
+        <View className="flex-row items-center gap-2">
+          <Skeleton width={32} height={32} borderRadius={12} />
+          <View className="gap-1.5 flex-1">
+            <Skeleton width="60%" height={16} borderRadius={6} />
+            <Skeleton width="50%" height={10} borderRadius={4} />
+          </View>
+        </View>
+
+        <View className="gap-3 mt-1">
+          {[...Array(4)].map((_, i) => (
+            <View
+              key={i}
+              className="p-3 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-500/20 gap-2"
+            >
+              <View className="flex-row items-center gap-2">
+                <Skeleton width={16} height={16} borderRadius={4} />
+                <Skeleton width="55%" height={13} borderRadius={4} />
+              </View>
+              <View className="gap-1.5 pl-6">
+                <Skeleton width="100%" height={11} borderRadius={3} />
+                <Skeleton width="92%" height={11} borderRadius={3} />
+                <Skeleton width="75%" height={11} borderRadius={3} />
+              </View>
+            </View>
+          ))}
+        </View>
+      </GlassCard>
+    </View>
+  );
 }
 
 export default function AiScreen() {
@@ -246,46 +225,61 @@ export default function AiScreen() {
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
   const colors = Colors[isDark ? "dark" : "light"];
+  const { config } = useSettings();
+  const toast = useToast();
 
-  const [activeMetric, setActiveMetric] = useState<MetricType>("ph");
-  const [selectedPointIndex, setSelectedPointIndex] = useState<number>(6);
-  const [chartWidth, setChartWidth] = useState<number>(
-    Dimensions.get("window").width - 64,
+  const [data, setData] = useState<SoilAiAnalysis | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const loadAiData = useCallback(
+    async (isManualRefresh = false) => {
+      if (isManualRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+      setErrorMessage(null);
+
+      try {
+        const result = await fetchSoilAiAnalysis({
+          ip: config.apiServerIp,
+          port: config.apiServerPort,
+        });
+
+        if (result) {
+          setData(result);
+          if (isManualRefresh) {
+            toast.success("Diagnosa AI berhasil diperbarui!");
+          }
+        } else {
+          setData(null);
+          setErrorMessage("Belum ada data diagnosa AI dari server.");
+          if (isManualRefresh) {
+            toast.info("Belum ada data diagnosa dari server.");
+          }
+        }
+      } catch (err: any) {
+        console.error("AI Fetch error:", err);
+        setErrorMessage(err?.message || "Gagal menghubungi API server.");
+        if (isManualRefresh) {
+          toast.error("Gagal memuat diagnosa: " + (err?.message || ""));
+        }
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [config.apiServerIp, config.apiServerPort, toast],
   );
 
-  const metric = METRICS_DATA[activeMetric];
-  const MetricIcon = metric.icon;
+  useEffect(() => {
+    loadAiData();
+  }, [loadAiData]);
 
-  const chartHeight = 160;
-  const paddingLeft = 32;
-  const paddingRight = 20;
-  const paddingTop = 24;
-  const paddingBottom = 28;
-
-  const usableWidth = Math.max(chartWidth - paddingLeft - paddingRight, 100);
-  const usableHeight = chartHeight - paddingTop - paddingBottom;
-
-  const points = metric.data.map((item, index) => {
-    const x = paddingLeft + (index / (metric.data.length - 1)) * usableWidth;
-    const clampedVal = Math.max(metric.minY, Math.min(metric.maxY, item.value));
-    const normalizedY =
-      (clampedVal - metric.minY) / (metric.maxY - metric.minY);
-    const y = paddingTop + (1 - normalizedY) * usableHeight;
-    return { x, y, data: item };
-  });
-
-  const linePath = buildSmoothPath(points);
-  const areaPath = points.length
-    ? `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${(chartHeight - paddingBottom).toFixed(1)} L ${points[0].x.toFixed(1)} ${(chartHeight - paddingBottom).toFixed(1)} Z`
-    : "";
-
-  const selectedPoint = points[selectedPointIndex] || points[points.length - 1];
-
-  const handleLayout = (e: LayoutChangeEvent) => {
-    const w = e.nativeEvent.layout.width;
-    if (w > 50) {
-      setChartWidth(w);
-    }
+  const onRefresh = () => {
+    loadAiData(true);
   };
 
   return (
@@ -309,318 +303,324 @@ export default function AiScreen() {
               Analisis Komprehensif Lahan Cerdas
             </Text>
           </View>
+
+          <Pressable
+            onPress={onRefresh}
+            disabled={isLoading || isRefreshing}
+            className="w-10 h-10 rounded-full border items-center justify-center bg-white/85 dark:bg-white/10 border-emerald-500/20 dark:border-white/15 active:opacity-70"
+          >
+            {isRefreshing ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <RefreshCw size={18} color={colors.primary} />
+            )}
+          </Pressable>
         </View>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerClassName="px-4 pt-2 pb-24 max-w-[500px] self-center w-full gap-4"
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+            />
+          }
         >
-          
+          {/* While Loading: Show Skeleton Instead of Default Dummy Data */}
+          {isLoading ? (
+            <AiScreenSkeleton />
+          ) : !data ? (
+            /* Empty / Not Found State */
+            <GlassCard
+              glowColor="#10B981"
+              contentClassName="p-6 rounded-[24px] items-center text-center gap-3"
+            >
+              <View className="w-14 h-14 rounded-2xl items-center justify-center bg-emerald-100 dark:bg-emerald-950/60 mt-2">
+                <AlertCircle size={28} color="#059669" />
+              </View>
 
-          <GlassCard
-            glowColor="#10B981"
-            contentClassName="p-4 rounded-[22px] gap-3"
-          >
-            <View className="flex-row items-center gap-2">
-              <View className="w-8 h-8 rounded-xl items-center justify-center bg-emerald-100 dark:bg-emerald-950/60">
-                <BrainCircuit size={18} color="#059669" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-base font-extrabold text-emerald-950 dark:text-emerald-50">
-                  Kesimpulan Hasil Data
-                </Text>
-                <Text className="text-[11px] text-emerald-800/70 dark:text-emerald-300/70">
-                  Sintesis Diagnosa AI & Algoritma Agronomi
-                </Text>
-              </View>
-              <View className="p-1 rounded-lg bg-emerald-500/10">
-                <Sparkles size={16} color="#059669" />
-              </View>
-            </View>
-
-            <Text className="text-xs text-emerald-950/80 dark:text-emerald-100/80 leading-relaxed">
-              Berdasarkan agregasi 168 titik data sensor telemetri (pH,
-              kelembapan, suhu) dan analisis citra daun, tanah perkebunan berada
-              dalam kondisi{" "}
-              <Text className="font-bold text-emerald-700 dark:text-emerald-300">
-                Sangat Produktif
+              <Text className="text-lg font-extrabold text-emerald-950 dark:text-emerald-50 text-center">
+                Belum Ada Hasil Diagnosa AI
               </Text>
-              . Penyangga kation tanah (buffering capacity) stabil pada pH 6.5,
-              kelembapan mikro tanah terjaga konsisten tanpa indikasi genangan
-              anoksik, serta tidak ditemukan jejak spora patogen busuk akar.
-            </Text>
 
-            <View className="flex-row flex-wrap gap-2 pt-1">
-              <View className="flex-1 min-w-[120px] p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5">
-                <Text className="text-[10px] text-gray-500">
-                  Status Biosfer
-                </Text>
-                <Text className="text-xs font-bold text-emerald-700 dark:text-emerald-300 mt-0.5">
-                  Mikroba Aktif
-                </Text>
-              </View>
+              <Text className="text-xs text-gray-600 dark:text-gray-300 text-center leading-relaxed max-w-[320px]">
+                {errorMessage ||
+                  "Sistem belum menemukan hasil analisis tanah. Pastikan kamera telah mengambil foto tanah terbaru untuk mendiagnosa kondisi lahan."}
+              </Text>
 
-              <View className="flex-1 min-w-[120px] p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5">
-                <Text className="text-[10px] text-gray-500">Retensi Air</Text>
-                <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50 mt-0.5">
-                  Optimal (68%)
-                </Text>
-              </View>
-
-              <View className="flex-1 min-w-[120px] p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5">
-                <Text className="text-[10px] text-gray-500">
-                  Tingkat Salinitas
-                </Text>
-                <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50 mt-0.5">
-                  Rendah (Aman)
-                </Text>
-              </View>
-
-              <View className="flex-1 min-w-[120px] p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5">
-                <Text className="text-[10px] text-gray-500">
-                  Risiko Penyakit
-                </Text>
-                <Text className="text-xs font-bold text-emerald-700 dark:text-emerald-300 mt-0.5">
-                  Sangat Rendah (4%)
-                </Text>
-              </View>
-            </View>
-          </GlassCard>
-
-          <GlassCard
-            glowColor="#059669"
-            contentClassName="p-4 rounded-[22px] gap-3"
-          >
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center gap-2">
-                <View className="w-8 h-8 rounded-xl items-center justify-center bg-emerald-100 dark:bg-emerald-950/60">
-                  <Award size={18} color="#059669" />
-                </View>
-                <View>
-                  <Text className="text-base font-extrabold text-emerald-950 dark:text-emerald-50">
-                    Kualitas Tanah
-                  </Text>
-                  <Text className="text-[11px] text-emerald-800/70 dark:text-emerald-300/70">
-                    Indeks Kesuburan & Karakteristik Fisik-Kimia
-                  </Text>
-                </View>
-              </View>
-
-              <View className="items-end">
-                <View className="flex-row items-baseline gap-0.5">
-                  <Text className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                    88
-                  </Text>
-                  <Text className="text-xs font-bold text-gray-400">/100</Text>
-                </View>
-                <Text className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300">
-                  Sangat Subur
-                </Text>
-              </View>
-            </View>
-
-            <View className="gap-2 mt-1">
-              {SOIL_QUALITY_PARAMS.map((param, i) => (
-                <View
-                  key={i}
-                  className="p-2.5 rounded-xl bg-white/70 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 gap-1.5"
+              <View className="flex-row gap-3 w-full mt-2">
+                <Pressable
+                  onPress={() => loadAiData(true)}
+                  className="flex-1 py-3 rounded-2xl border border-black/10 dark:border-white/20 bg-white/80 dark:bg-white/10 items-center flex-row justify-center gap-2 active:opacity-70"
                 >
-                  <View className="flex-row justify-between items-center">
-                    <View className="flex-1 mr-2">
-                      <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50">
-                        {param.label}
-                      </Text>
-                      <Text className="text-[10px] text-gray-500">
-                        {param.note}
-                      </Text>
-                    </View>
-                    <View className="items-end">
-                      <Text className="text-xs font-extrabold text-emerald-900 dark:text-emerald-100">
-                        {param.value}
-                      </Text>
-                      <Text className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
-                        {param.status}
-                      </Text>
-                    </View>
-                  </View>
+                  <RotateCcw size={16} color={colors.text} />
+                  <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50">
+                    Coba Lagi
+                  </Text>
+                </Pressable>
 
-                  <View className="w-full h-1.5 rounded-full bg-black/5 dark:bg-white/10 overflow-hidden">
-                    <View
-                      className="h-full rounded-full bg-emerald-500"
-                      style={{ width: `${param.score}%` }}
-                    />
-                  </View>
-                </View>
-              ))}
-            </View>
-          </GlassCard>
-
-          <GlassCard
-            glowColor="#10B981"
-            contentClassName="p-4 rounded-[22px] gap-3"
-          >
-            <View className="flex-row items-center gap-2">
-              <View className="w-8 h-8 rounded-xl items-center justify-center bg-emerald-100 dark:bg-emerald-950/60">
-                <Sprout size={18} color="#059669" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-base font-extrabold text-emerald-950 dark:text-emerald-50">
-                  Tanaman yang Cocok Ditanam
-                </Text>
-                <Text className="text-[11px] text-emerald-800/70 dark:text-emerald-300/70">
-                  Rekomendasi Berdasarkan Profil pH, Suhu, & Kelembapan
-                </Text>
-              </View>
-            </View>
-
-            <View className="gap-2.5 mt-1">
-              {RECOMMENDED_CROPS.map((crop, i) => (
-                <View
-                  key={i}
-                  className="p-3 rounded-2xl bg-white/70 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 gap-2"
+                <Pressable
+                  onPress={() => router.push("/camera")}
+                  className="flex-[1.2] py-3 rounded-2xl bg-emerald-600 items-center flex-row justify-center gap-2 shadow-sm active:opacity-85"
                 >
-                  <View className="flex-row justify-between items-start">
+                  <Camera size={16} color="#FFFFFF" />
+                  <Text className="text-xs font-bold text-white">
+                    Ambil Foto
+                  </Text>
+                </Pressable>
+              </View>
+            </GlassCard>
+          ) : (
+            /* Render Live AI Diagnosed Data */
+            <>
+              {/* Card 1: Kesimpulan Hasil Data & Klasifikasi Tanah */}
+              <GlassCard
+                glowColor="#10B981"
+                contentClassName="p-4 rounded-[22px] gap-3"
+              >
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center gap-2 flex-1 mr-2">
+                    <View className="w-8 h-8 rounded-xl items-center justify-center bg-emerald-100 dark:bg-emerald-950/60">
+                      <BrainCircuit size={18} color="#059669" />
+                    </View>
                     <View className="flex-1">
-                      <Text className="text-sm font-bold text-emerald-950 dark:text-emerald-50">
-                        {crop.name}
+                      <Text className="text-base font-extrabold text-emerald-950 dark:text-emerald-50">
+                        Kesimpulan Hasil Data
                       </Text>
-                      <Text className="text-[11px] italic text-gray-500">
-                        {crop.latin}
+                      <Text className="text-[11px] text-emerald-800/70 dark:text-emerald-300/70">
+                        Sintesis Diagnosa AI & Algoritma Agronomi
                       </Text>
                     </View>
+                  </View>
 
+                  <View className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                    <Sparkles size={14} color="#059669" />
+                    <Text className="text-[11px] font-bold text-emerald-800 dark:text-emerald-200">
+                      AI Ready
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Highlight Klasifikasi Tanah */}
+                <View className="flex-row items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                  <Layers size={16} color="#059669" />
+                  <View className="flex-1 flex-row items-baseline justify-between">
+                    <Text className="text-xs text-gray-600 dark:text-gray-300 font-medium">
+                      Klasifikasi Tanah:
+                    </Text>
+                    <Text className="text-sm font-extrabold text-emerald-800 dark:text-emerald-200">
+                      Tanah {data.soilType}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text className="text-xs text-emerald-950/80 dark:text-emerald-100/80 leading-relaxed">
+                  {data.kesimpulan}
+                </Text>
+
+                {/* Badges Grid */}
+                <View className="flex-row flex-wrap gap-2 pt-1">
+                  <View className="flex-1 min-w-[120px] p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5">
+                    <Text className="text-[10px] text-gray-500">
+                      Klasifikasi
+                    </Text>
+                    <Text className="text-xs font-bold text-emerald-700 dark:text-emerald-300 mt-0.5">
+                      {data.soilType}
+                    </Text>
+                  </View>
+
+                  <View className="flex-1 min-w-[120px] p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5">
+                    <Text className="text-[10px] text-gray-500">
+                      Retensi Air
+                    </Text>
+                    <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50 mt-0.5">
+                      {data.retensiAir}
+                    </Text>
+                  </View>
+
+                  <View className="flex-1 min-w-[120px] p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5">
+                    <Text className="text-[10px] text-gray-500">
+                      Tingkat Salinitas
+                    </Text>
+                    <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50 mt-0.5">
+                      {data.tingkatSalinitas}
+                    </Text>
+                  </View>
+
+                  <View className="flex-1 min-w-[120px] p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5">
+                    <Text className="text-[10px] text-gray-500">
+                      Risiko Penyakit
+                    </Text>
+                    <Text className="text-xs font-bold text-emerald-700 dark:text-emerald-300 mt-0.5">
+                      {data.risikoPenyakit}
+                    </Text>
+                  </View>
+                </View>
+              </GlassCard>
+
+              {/* Card 2: Kualitas Tanah & Skor Dinamis */}
+              <GlassCard
+                glowColor="#059669"
+                contentClassName="p-4 rounded-[22px] gap-3"
+              >
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center gap-2">
+                    <View className="w-8 h-8 rounded-xl items-center justify-center bg-emerald-100 dark:bg-emerald-950/60">
+                      <Award size={18} color="#059669" />
+                    </View>
+                    <View>
+                      <Text className="text-base font-extrabold text-emerald-950 dark:text-emerald-50">
+                        Kualitas Tanah
+                      </Text>
+                      <Text className="text-[11px] text-emerald-800/70 dark:text-emerald-300/70">
+                        Tipe: Tanah {data.soilType}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View className="items-end">
+                    <View className="flex-row items-baseline gap-0.5">
+                      <Text className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                        {data.score}
+                      </Text>
+                      <Text className="text-xs font-bold text-gray-400">
+                        /100
+                      </Text>
+                    </View>
+                    <Text className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300">
+                      {data.statusKualitas}
+                    </Text>
+                  </View>
+                </View>
+              </GlassCard>
+
+              {/* Card 3: Tanaman yang Cocok Ditanam */}
+              <GlassCard
+                glowColor="#10B981"
+                contentClassName="p-4 rounded-[22px] gap-3"
+              >
+                <View className="flex-row items-center gap-2">
+                  <View className="w-8 h-8 rounded-xl items-center justify-center bg-emerald-100 dark:bg-emerald-950/60">
+                    <Sprout size={18} color="#059669" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-base font-extrabold text-emerald-950 dark:text-emerald-50">
+                      Tanaman yang Cocok Ditanam
+                    </Text>
+                    <Text className="text-[11px] text-emerald-800/70 dark:text-emerald-300/70">
+                      Rekomendasi Berdasarkan Profil Tanah {data.soilType}
+                    </Text>
+                  </View>
+                </View>
+
+                <View className="gap-2.5 mt-1">
+                  {(data.tanamanCocok || []).map((crop, i) => (
                     <View
-                      className={`px-2 py-0.5 rounded-full border ${crop.badgeColor}`}
+                      key={i}
+                      className="p-3 rounded-2xl bg-white/70 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 gap-2"
                     >
-                      <Text className="text-[10px] font-bold">
-                        {crop.compatibility}% {crop.badge}
+                      <View className="flex-row justify-between items-start">
+                        <View className="flex-1">
+                          <Text className="text-sm font-bold text-emerald-950 dark:text-emerald-50">
+                            {crop.name}
+                          </Text>
+                          <Text className="text-[11px] italic text-gray-500">
+                            {crop.latin}
+                          </Text>
+                        </View>
+
+                        <View
+                          className={`px-2 py-0.5 rounded-full border ${getCropBadgeStyle(
+                            crop.compatibility,
+                            crop.badgeColor,
+                          )}`}
+                        >
+                          <Text className="text-[10px] font-bold">
+                            {crop.compatibility}% {crop.badge}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Text className="text-xs text-emerald-900/80 dark:text-emerald-200/80 leading-relaxed">
+                        {crop.reason}
                       </Text>
+
+                      <View className="flex-row items-center gap-3 pt-1 border-t border-black/5 dark:border-white/5">
+                        <View className="flex-row items-center gap-1">
+                          <Calendar size={11} color="#059669" />
+                          <Text className="text-[11px] text-gray-600 dark:text-gray-300 font-medium">
+                            Panen: {crop.cycle}
+                          </Text>
+                        </View>
+
+                        <View className="flex-row items-center gap-1">
+                          <Droplets size={11} color="#0284C7" />
+                          <Text className="text-[11px] text-gray-600 dark:text-gray-300 font-medium">
+                            Air: {crop.waterNeed}
+                          </Text>
+                        </View>
+                      </View>
                     </View>
+                  ))}
+                </View>
+              </GlassCard>
+
+              {/* Card 4: Rekomendasi Perawatan Tanah */}
+              <GlassCard
+                glowColor="#10B981"
+                contentClassName="p-4 rounded-[22px] gap-3"
+              >
+                <View className="flex-row items-center gap-2">
+                  <View className="w-8 h-8 rounded-xl items-center justify-center bg-emerald-100 dark:bg-emerald-950/60">
+                    <Wrench size={18} color="#059669" />
                   </View>
-
-                  <Text className="text-xs text-emerald-900/80 dark:text-emerald-200/80 leading-relaxed">
-                    {crop.reason}
-                  </Text>
-
-                  <View className="flex-row items-center gap-3 pt-1 border-t border-black/5 dark:border-white/5">
-                    <View className="flex-row items-center gap-1">
-                      <Calendar size={11} color="#059669" />
-                      <Text className="text-[11px] text-gray-600 dark:text-gray-300 font-medium">
-                        Panen: {crop.cycle}
-                      </Text>
-                    </View>
-
-                    <View className="flex-row items-center gap-1">
-                      <Droplets size={11} color="#0284C7" />
-                      <Text className="text-[11px] text-gray-600 dark:text-gray-300 font-medium">
-                        Air: {crop.waterNeed}
-                      </Text>
-                    </View>
+                  <View className="flex-1">
+                    <Text className="text-base font-extrabold text-emerald-950 dark:text-emerald-50">
+                      Rekomendasi Perawatan Tanah
+                    </Text>
+                    <Text className="text-[11px] text-emerald-800/70 dark:text-emerald-300/70">
+                      Instruksi Agronomi untuk Tanah {data.soilType}
+                    </Text>
                   </View>
                 </View>
-              ))}
-            </View>
-          </GlassCard>
 
-          <GlassCard
-            glowColor="#10B981"
-            contentClassName="p-4 rounded-[22px] gap-3"
-          >
-            <View className="flex-row items-center gap-2">
-              <View className="w-8 h-8 rounded-xl items-center justify-center bg-emerald-100 dark:bg-emerald-950/60">
-                <Wrench size={18} color="#059669" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-base font-extrabold text-emerald-950 dark:text-emerald-50">
-                  Rekomendasi Perawatan Tanah
-                </Text>
-                <Text className="text-[11px] text-emerald-800/70 dark:text-emerald-300/70">
-                  Instruksi Agronomi untuk Hasil Panen Maksimal
-                </Text>
-              </View>
-            </View>
+                <View className="gap-3 mt-1">
+                  {(data.perawatanTanah || []).map((care, i) => (
+                    <View
+                      key={i}
+                      className="p-3 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-500/20 gap-1.5"
+                    >
+                      <View className="flex-row items-center gap-1.5">
+                        {getCategoryIcon(care.category)}
+                        <Text className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                          {care.title}
+                        </Text>
+                      </View>
 
-            <View className="gap-3 mt-1">
-              <View className="p-3 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-500/20 gap-1.5">
-                <View className="flex-row items-center gap-1.5">
-                  <Layers size={15} color="#059669" />
-                  <Text className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                    1. Cara Menggemburkan (Aerasi Tanah)
-                  </Text>
-                </View>
-                <Text className="text-xs text-emerald-950/80 dark:text-emerald-200/80 leading-relaxed pl-5">
-                  Lakukan pendangiran ringan (dangir) sedalam 15 - 20 cm di
-                  sekitar lingkar tajuk. Hindari pencangkulan terlalu dekat
-                  dengan leher akar utama. Lakukan di pagi hari saat kelembapan
-                  tanah berada di bawah 70% agar agregat tanah tidak memadat
-                  kembali.
-                </Text>
-              </View>
+                      <Text className="text-xs text-emerald-950/80 dark:text-emerald-200/80 leading-relaxed pl-5">
+                        {care.description}
+                      </Text>
 
-              <View className="p-3 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-500/20 gap-1.5">
-                <View className="flex-row items-center gap-1.5">
-                  <Sprout size={15} color="#059669" />
-                  <Text className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                    2. Saran Pemupukan Berimbang
-                  </Text>
+                      {care.points && care.points.length > 0 && (
+                        <View className="gap-1 pl-5 mt-1">
+                          {care.points.map((pt, pIdx) => (
+                            <Text
+                              key={pIdx}
+                              className="text-xs text-emerald-950/80 dark:text-emerald-200/80 leading-relaxed"
+                            >
+                              • {pt}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  ))}
                 </View>
-                <View className="gap-1 pl-5">
-                  <Text className="text-xs text-emerald-950/80 dark:text-emerald-200/80 leading-relaxed">
-                    • <Text className="font-semibold">Pupuk Organik:</Text>{" "}
-                    Taburkan 1.5 - 2 kg kompos matang atau pupuk kascing per m²
-                    untuk menjaga populasi cacing tanah dan mikroba dekomposer.
-                  </Text>
-                  <Text className="text-xs text-emerald-950/80 dark:text-emerald-200/80 leading-relaxed">
-                    •{" "}
-                    <Text className="font-semibold">
-                      Pupuk Kimia (NPK 16-16-16):
-                    </Text>{" "}
-                    Aplikasi 5 - 7 gram per tanaman tiap 14 hari dengan metode
-                    kocor (dilarutkan dalam 200 ml air) untuk serapan hara
-                    instan.
-                  </Text>
-                  <Text className="text-xs text-emerald-950/80 dark:text-emerald-200/80 leading-relaxed">
-                    •{" "}
-                    <Text className="font-semibold">
-                      Bio-fertilizer / PGPR:
-                    </Text>{" "}
-                    Semprotkan larutan Plant Growth-Promoting Rhizobacteria
-                    sebulan sekali untuk melarutkan fosfat terikat.
-                  </Text>
-                </View>
-              </View>
-
-              <View className="p-3 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-500/20 gap-1.5">
-                <View className="flex-row items-center gap-1.5">
-                  <Droplets size={15} color="#0284C7" />
-                  <Text className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                    3. Pengaturan Drainase & Irigasi
-                  </Text>
-                </View>
-                <Text className="text-xs text-emerald-950/80 dark:text-emerald-200/80 leading-relaxed pl-5">
-                  Gunakan sistem irigasi tetes (drip) dengan debit 1.5 - 2 liter
-                  per jam per titik. Pastikan kedalaman parit drainase minimal
-                  20 cm di samping bedengan untuk mencegah akumulasi genangan
-                  air saat hujan deras.
-                </Text>
-              </View>
-
-              <View className="p-3 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-500/20 gap-1.5">
-                <View className="flex-row items-center gap-1.5">
-                  <ShieldCheck size={15} color="#059669" />
-                  <Text className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                    4. Pencegahan Jamur & Patogen Tanah
-                  </Text>
-                </View>
-                <Text className="text-xs text-emerald-950/80 dark:text-emerald-200/80 leading-relaxed pl-5">
-                  Inokulasikan jamur antagonis Trichoderma harzianum pada media
-                  tanam setiap 30 hari sebagai biofungisida alami guna menangkal
-                  serangan layu fusarium dan busuk pangkal batang
-                  (Phytophthora).
-                </Text>
-              </View>
-            </View>
-          </GlassCard>
+              </GlassCard>
+            </>
+          )}
         </ScrollView>
       </SafeAreaView>
     </View>

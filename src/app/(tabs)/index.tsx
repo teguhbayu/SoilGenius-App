@@ -4,6 +4,7 @@ import {
   Calendar,
   Camera,
   ChevronRight,
+  Cpu,
   Droplets,
   Flame,
   FlaskConical,
@@ -29,10 +30,12 @@ import {
 
 import { GlassCard } from "@/components/ui/glass-card";
 import { MeshBackground } from "@/components/ui/mesh-background";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useSettings } from "@/hooks/use-settings";
 import { useSoilData } from "@/hooks/use-soil-data";
+import { useToast } from "@/hooks/use-toast";
 import { MetricConfig, MetricType } from "@/types/soil";
 import Svg, {
   Circle,
@@ -57,15 +60,7 @@ const METRICS_DATA: Record<MetricType, MetricConfig> = {
     maxY: 7.5,
     targetRange: "6.0 - 7.0 pH",
     statusLabel: "Netral Optimal",
-    data: [
-      { day: "Sen", value: 6.1, date: "5 Sep" },
-      { day: "Sel", value: 6.3, date: "6 Sep" },
-      { day: "Rab", value: 6.2, date: "7 Sep" },
-      { day: "Kam", value: 6.5, date: "8 Sep" },
-      { day: "Jum", value: 6.4, date: "9 Sep" },
-      { day: "Sab", value: 6.6, date: "10 Sep" },
-      { day: "Min", value: 6.5, date: "11 Sep" },
-    ],
+    data: [],
   },
   moisture: {
     id: "moisture",
@@ -78,15 +73,7 @@ const METRICS_DATA: Record<MetricType, MetricConfig> = {
     maxY: 90,
     targetRange: "60% - 75%",
     statusLabel: "Kadar Ideal",
-    data: [
-      { day: "Sen", value: 58, date: "5 Sep" },
-      { day: "Sel", value: 62, date: "6 Sep" },
-      { day: "Rab", value: 60, date: "7 Sep" },
-      { day: "Kam", value: 68, date: "8 Sep" },
-      { day: "Jum", value: 65, date: "9 Sep" },
-      { day: "Sab", value: 72, date: "10 Sep" },
-      { day: "Min", value: 68, date: "11 Sep" },
-    ],
+    data: [],
   },
   temperature: {
     id: "temperature",
@@ -99,15 +86,7 @@ const METRICS_DATA: Record<MetricType, MetricConfig> = {
     maxY: 32,
     targetRange: "24°C - 28°C",
     statusLabel: "Suhu Normal",
-    data: [
-      { day: "Sen", value: 28.2, date: "5 Sep" },
-      { day: "Sel", value: 27.5, date: "6 Sep" },
-      { day: "Rab", value: 26.8, date: "7 Sep" },
-      { day: "Kam", value: 25.4, date: "8 Sep" },
-      { day: "Jum", value: 26.0, date: "9 Sep" },
-      { day: "Sab", value: 27.1, date: "10 Sep" },
-      { day: "Min", value: 26.4, date: "11 Sep" },
-    ],
+    data: [],
   },
 };
 
@@ -147,6 +126,7 @@ export default function DashboardScreen() {
   const router = useRouter();
   const scheme = useColorScheme();
   const { config } = useSettings();
+  const toast = useToast();
   const [activeMetric, setActiveMetric] = useState<MetricType>("ph");
   const [selectedPointIndex, setSelectedPointIndex] = useState<number>(6);
   const [chartWidth, setChartWidth] = useState<number>(
@@ -159,6 +139,7 @@ export default function DashboardScreen() {
     metricsData,
     currentRecord,
     isConnected,
+    isLoading,
     isRefreshing,
     lastUpdated,
     refresh,
@@ -174,9 +155,9 @@ export default function DashboardScreen() {
   const MetricIcon = metric.icon;
   const [activePreset, setActivePreset] = useState<PresetType>("normal");
 
-  const phValue = currentRecord?.ph ?? 6.8;
-  const tempValue = currentRecord?.tempC ?? 32.5;
-  const moistureValue = currentRecord?.moisture ?? 31;
+  const phValue = currentRecord?.ph;
+  const tempValue = currentRecord?.tempC;
+  const moistureValue = currentRecord?.moisture;
 
   React.useEffect(() => {
     if (metric.data.length > 0) {
@@ -225,6 +206,17 @@ export default function DashboardScreen() {
 
   const onRefresh = () => {
     refresh();
+  };
+
+  const handleAnalyzePress = () => {
+    if (currentRecord?.photo && currentRecord.photo.trim() !== "") {
+      router.push("/ai");
+    } else {
+      toast.info(
+        "Foto belum tersedia. Silakan ambil foto tanah terlebih dahulu."
+      );
+      router.push("/camera");
+    }
   };
 
   const getPhAccent = (ph: number) => {
@@ -317,9 +309,9 @@ export default function DashboardScreen() {
     };
   };
 
-  const phAccent = getPhAccent(phValue);
-  const tempAccent = getTempAccent(tempValue);
-  const moistureAccent = getMoistureAccent(moistureValue);
+  const phAccent = getPhAccent(phValue ?? 7.0);
+  const tempAccent = getTempAccent(tempValue ?? 26.0);
+  const moistureAccent = getMoistureAccent(moistureValue ?? 60.0);
   const TempIcon = tempAccent.icon;
 
   return (
@@ -401,15 +393,19 @@ export default function DashboardScreen() {
                   >
                     <FlaskConical size={16} color={phAccent.color} />
                   </View>
-                  <View
-                    className={`px-2 py-0.5 rounded-lg ${phAccent.bgClass}`}
-                  >
-                    <Text
-                      className={`text-[11px] font-extrabold ${phAccent.textClass}`}
+                  {isLoading ? (
+                    <Skeleton width={56} height={20} borderRadius={8} />
+                  ) : (
+                    <View
+                      className={`px-2 py-0.5 rounded-lg ${phAccent.bgClass}`}
                     >
-                      {phAccent.label}
-                    </Text>
-                  </View>
+                      <Text
+                        className={`text-[11px] font-extrabold ${phAccent.textClass}`}
+                      >
+                        {phAccent.label}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 <Text className="text-[13px] font-semibold text-emerald-900/70 dark:text-emerald-200/70 mt-1.5">
@@ -417,12 +413,18 @@ export default function DashboardScreen() {
                 </Text>
 
                 <View className="flex-row items-baseline gap-1 mt-0.5">
-                  <Text className="text-3xl font-extrabold tracking-tight leading-9 text-emerald-950 dark:text-emerald-50">
-                    {phValue.toFixed(1)}
-                  </Text>
-                  <Text className={`text-sm font-bold ${phAccent.textClass}`}>
-                    pH
-                  </Text>
+                  {isLoading ? (
+                    <Skeleton width={80} height={32} borderRadius={8} />
+                  ) : (
+                    <>
+                      <Text className="text-3xl font-extrabold tracking-tight leading-9 text-emerald-950 dark:text-emerald-50">
+                        {phValue !== undefined ? phValue.toFixed(1) : "-"}
+                      </Text>
+                      <Text className={`text-sm font-bold ${phAccent.textClass}`}>
+                        pH
+                      </Text>
+                    </>
+                  )}
                 </View>
               </GlassCard>
             </View>
@@ -439,15 +441,19 @@ export default function DashboardScreen() {
                   >
                     <TempIcon size={16} color={tempAccent.color} />
                   </View>
-                  <View
-                    className={`px-2 py-0.5 rounded-lg ${tempAccent.bgClass}`}
-                  >
-                    <Text
-                      className={`text-[11px] font-extrabold ${tempAccent.textClass}`}
+                  {isLoading ? (
+                    <Skeleton width={56} height={20} borderRadius={8} />
+                  ) : (
+                    <View
+                      className={`px-2 py-0.5 rounded-lg ${tempAccent.bgClass}`}
                     >
-                      {tempAccent.label}
-                    </Text>
-                  </View>
+                      <Text
+                        className={`text-[11px] font-extrabold ${tempAccent.textClass}`}
+                      >
+                        {tempAccent.label}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 <Text className="text-[13px] font-semibold text-emerald-900/70 dark:text-emerald-200/70 mt-1.5">
@@ -455,14 +461,20 @@ export default function DashboardScreen() {
                 </Text>
 
                 <View className="flex-row items-baseline gap-1 mt-0.5">
-                  <Text
-                    className={`text-3xl font-extrabold tracking-tight leading-9 ${tempAccent.valueClass}`}
-                  >
-                    {tempValue.toFixed(1)}
-                  </Text>
-                  <Text className={`text-sm font-bold ${tempAccent.textClass}`}>
-                    °C
-                  </Text>
+                  {isLoading ? (
+                    <Skeleton width={75} height={32} borderRadius={8} />
+                  ) : (
+                    <>
+                      <Text
+                        className={`text-3xl font-extrabold tracking-tight leading-9 ${tempAccent.valueClass}`}
+                      >
+                        {tempValue !== undefined ? tempValue.toFixed(1) : "-"}
+                      </Text>
+                      <Text className={`text-sm font-bold ${tempAccent.textClass}`}>
+                        °C
+                      </Text>
+                    </>
+                  )}
                 </View>
               </GlassCard>
             </View>
@@ -479,15 +491,19 @@ export default function DashboardScreen() {
                   >
                     <Droplets size={16} color={moistureAccent.color} />
                   </View>
-                  <View
-                    className={`px-2 py-0.5 rounded-lg ${moistureAccent.bgClass}`}
-                  >
-                    <Text
-                      className={`text-[11px] font-extrabold ${moistureAccent.textClass}`}
+                  {isLoading ? (
+                    <Skeleton width={56} height={20} borderRadius={8} />
+                  ) : (
+                    <View
+                      className={`px-2 py-0.5 rounded-lg ${moistureAccent.bgClass}`}
                     >
-                      {moistureAccent.label}
-                    </Text>
-                  </View>
+                      <Text
+                        className={`text-[11px] font-extrabold ${moistureAccent.textClass}`}
+                      >
+                        {moistureAccent.label}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 <Text className="text-[13px] font-semibold text-emerald-900/70 dark:text-emerald-200/70 mt-1.5">
@@ -495,20 +511,26 @@ export default function DashboardScreen() {
                 </Text>
 
                 <View className="flex-row items-baseline gap-1 mt-0.5">
-                  <Text className="text-3xl font-extrabold tracking-tight leading-9 text-emerald-950 dark:text-emerald-50">
-                    {moistureValue}
-                  </Text>
-                  <Text
-                    className={`text-sm font-bold ${moistureAccent.textClass}`}
-                  >
-                    %
-                  </Text>
+                  {isLoading ? (
+                    <Skeleton width={70} height={32} borderRadius={8} />
+                  ) : (
+                    <>
+                      <Text className="text-3xl font-extrabold tracking-tight leading-9 text-emerald-950 dark:text-emerald-50">
+                        {moistureValue !== undefined ? moistureValue : "-"}
+                      </Text>
+                      <Text
+                        className={`text-sm font-bold ${moistureAccent.textClass}`}
+                      >
+                        %
+                      </Text>
+                    </>
+                  )}
                 </View>
               </GlassCard>
             </View>
           </View>
           <Pressable
-            onPress={() => router.push("/ai")}
+            onPress={handleAnalyzePress}
             className="flex-1 active:scale-[0.98]"
           >
             <View className="p-2.5 rounded-[18px] flex-row justify-center items-center gap-2 bg-green-700 text-white">
@@ -570,6 +592,31 @@ export default function DashboardScreen() {
               </GlassCard>
             </Pressable>
           </View>
+
+          <Pressable
+            onPress={() => router.push("/actuator")}
+            className="active:scale-[0.98] mt-1"
+          >
+            <GlassCard
+              glowColor="#10B981"
+              borderColor="rgba(16, 185, 129, 0.4)"
+              contentClassName="p-2.5 rounded-[18px] flex-row items-center gap-2.5"
+            >
+              <View className="w-8 h-8 rounded-[10px] items-center justify-center bg-emerald-600 shadow-sm shadow-emerald-600/40">
+                <Cpu size={18} color="#FFFFFF" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50">
+                  Kontrol Aktuator & Relai IoT
+                </Text>
+                <Text className="text-[10px] text-emerald-800/70 dark:text-emerald-300/70">
+                  Pompa Irigasi, Dosing Pupuk, Blower Aerasi
+                </Text>
+              </View>
+              <ChevronRight size={16} color="#059669" />
+            </GlassCard>
+          </Pressable>
+
           <GlassCard
             glowColor={metric.color}
             contentClassName="p-4 rounded-[22px] gap-3"
@@ -583,21 +630,34 @@ export default function DashboardScreen() {
                   <MetricIcon size={18} color={metric.color} />
                 </View>
                 <View>
-                  <Text className="text-sm font-extrabold text-emerald-950 dark:text-emerald-50">
-                    Tren Historis Tanah ({metric.data.length} Titik Data)
-                  </Text>
-                  <Text className="text-[11px] text-emerald-800/70 dark:text-emerald-300/70">
-                    Rentang Target: {metric.targetRange}
-                  </Text>
+                  {isLoading ? (
+                    <View className="gap-1">
+                      <Skeleton width={140} height={16} borderRadius={4} />
+                      <Skeleton width={110} height={11} borderRadius={4} />
+                    </View>
+                  ) : (
+                    <>
+                      <Text className="text-sm font-extrabold text-emerald-950 dark:text-emerald-50">
+                        Tren Historis Tanah ({metric.data.length} Titik Data)
+                      </Text>
+                      <Text className="text-[11px] text-emerald-800/70 dark:text-emerald-300/70">
+                        Rentang Target: {metric.targetRange}
+                      </Text>
+                    </>
+                  )}
                 </View>
               </View>
 
-              <View className="flex-row items-center gap-1 bg-emerald-100 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg">
-                <TrendingUp size={12} color="#059669" />
-                <Text className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
-                  {metric.statusLabel}
-                </Text>
-              </View>
+              {isLoading ? (
+                <Skeleton width={80} height={22} borderRadius={8} />
+              ) : (
+                <View className="flex-row items-center gap-1 bg-emerald-100 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg">
+                  <TrendingUp size={12} color="#059669" />
+                  <Text className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
+                    {metric.statusLabel}
+                  </Text>
+                </View>
+              )}
             </View>
 
             <View className="flex-row gap-1.5 p-1 rounded-xl bg-black/[0.03] dark:bg-white/[0.04]">
@@ -641,150 +701,186 @@ export default function DashboardScreen() {
               )}
             </View>
 
-            <View className="p-2.5 rounded-xl border border-emerald-500/20 bg-white/60 dark:bg-white/[0.04] flex-row items-center justify-between">
-              <View className="flex-row items-center gap-2">
-                <Calendar size={14} color="#059669" />
-                <Text className="text-xs text-gray-600 dark:text-gray-300 font-medium">
-                  {selectedPoint.data.day} ({selectedPoint.data.date}):
-                </Text>
-                <Text className="text-sm font-extrabold text-emerald-950 dark:text-emerald-50">
-                  {selectedPoint.data.value} {metric.unit}
+            {isLoading ? (
+              <Skeleton width="100%" height={38} borderRadius={12} />
+            ) : metric.data.length > 0 ? (
+              <View className="p-2.5 rounded-xl border border-emerald-500/20 bg-white/60 dark:bg-white/[0.04] flex-row items-center justify-between">
+                <View className="flex-row items-center gap-2">
+                  <Calendar size={14} color="#059669" />
+                  <Text className="text-xs text-gray-600 dark:text-gray-300 font-medium">
+                    {selectedPoint.data.day} ({selectedPoint.data.date}):
+                  </Text>
+                  <Text className="text-sm font-extrabold text-emerald-950 dark:text-emerald-50">
+                    {selectedPoint.data.value} {metric.unit}
+                  </Text>
+                </View>
+                <Text className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                  Ketuk titik grafik
                 </Text>
               </View>
-              <Text className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
-                Ketuk titik grafik
-              </Text>
-            </View>
+            ) : null}
 
-            <View onLayout={handleLayout} className="w-full h-40 mt-1">
-              <Svg width={chartWidth} height={chartHeight}>
-                <Defs>
-                  <SvgLinearGradient
-                    id="chartGradient"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
+            <View onLayout={handleLayout} className="w-full h-40 mt-1 justify-center items-center">
+              {isLoading ? (
+                <View className="w-full h-full justify-between py-2">
+                  <View className="w-full flex-row justify-between items-center px-1">
+                    <Skeleton width={26} height={10} borderRadius={3} />
+                    <Skeleton width="86%" height={1} borderRadius={1} />
+                  </View>
+                  <View className="w-full flex-row justify-between items-center px-1">
+                    <Skeleton width={26} height={10} borderRadius={3} />
+                    <Skeleton width="86%" height={1} borderRadius={1} />
+                  </View>
+                  <View className="w-full flex-row justify-between items-center px-1">
+                    <Skeleton width={26} height={10} borderRadius={3} />
+                    <Skeleton width="86%" height={1} borderRadius={1} />
+                  </View>
+                  <View className="w-full flex-row justify-around items-end pt-2 px-6">
+                    {[38, 55, 42, 68, 50, 75, 62].map((barHeight, i) => (
+                      <View key={i} className="items-center gap-1.5">
+                        <Skeleton width={10} height={barHeight} borderRadius={4} />
+                        <Skeleton width={22} height={8} borderRadius={2} />
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ) : metric.data.length === 0 ? (
+                <View className="items-center justify-center gap-2 py-8">
+                  <TrendingUp size={28} color={isDark ? "#34D399" : "#059669"} opacity={0.5} />
+                  <Text className="text-xs text-gray-500 font-medium">
+                    Belum ada data historis rekaman sensor
+                  </Text>
+                </View>
+              ) : (
+                <Svg width={chartWidth} height={chartHeight}>
+                  <Defs>
+                    <SvgLinearGradient
+                      id="chartGradient"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <Stop
+                        offset="0%"
+                        stopColor={metric.color}
+                        stopOpacity={0.35}
+                      />
+                      <Stop
+                        offset="50%"
+                        stopColor={metric.color}
+                        stopOpacity={0.12}
+                      />
+                      <Stop
+                        offset="100%"
+                        stopColor={metric.color}
+                        stopOpacity={0}
+                      />
+                    </SvgLinearGradient>
+                  </Defs>
+
+                  {[0.25, 0.5, 0.75].map((fraction) => {
+                    const yPos = paddingTop + fraction * usableHeight;
+                    return (
+                      <Line
+                        key={fraction}
+                        x1={paddingLeft}
+                        y1={yPos}
+                        x2={chartWidth - paddingRight}
+                        y2={yPos}
+                        stroke={
+                          isDark
+                            ? "rgba(255, 255, 255, 0.08)"
+                            : "rgba(0, 0, 0, 0.06)"
+                        }
+                        strokeDasharray="4 4"
+                        strokeWidth={1}
+                      />
+                    );
+                  })}
+
+                  <SvgText
+                    x={paddingLeft - 6}
+                    y={paddingTop + 4}
+                    fill={isDark ? "#9CA3AF" : "#64748B"}
+                    fontSize="9"
+                    fontWeight="600"
+                    textAnchor="end"
                   >
-                    <Stop
-                      offset="0%"
-                      stopColor={metric.color}
-                      stopOpacity={0.35}
+                    {metric.maxY}
+                  </SvgText>
+
+                  <SvgText
+                    x={paddingLeft - 6}
+                    y={chartHeight - paddingBottom + 2}
+                    fill={isDark ? "#9CA3AF" : "#64748B"}
+                    fontSize="9"
+                    fontWeight="600"
+                    textAnchor="end"
+                  >
+                    {metric.minY}
+                  </SvgText>
+
+                  {areaPath !== "" && (
+                    <Path d={areaPath} fill="url(#chartGradient)" />
+                  )}
+
+                  {linePath !== "" && (
+                    <Path
+                      d={linePath}
+                      fill="none"
+                      stroke={metric.color}
+                      strokeWidth={2.5}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     />
-                    <Stop
-                      offset="50%"
-                      stopColor={metric.color}
-                      stopOpacity={0.12}
-                    />
-                    <Stop
-                      offset="100%"
-                      stopColor={metric.color}
-                      stopOpacity={0}
-                    />
-                  </SvgLinearGradient>
-                </Defs>
+                  )}
 
-                {[0.25, 0.5, 0.75].map((fraction) => {
-                  const yPos = paddingTop + fraction * usableHeight;
-                  return (
-                    <Line
-                      key={fraction}
-                      x1={paddingLeft}
-                      y1={yPos}
-                      x2={chartWidth - paddingRight}
-                      y2={yPos}
-                      stroke={
-                        isDark
-                          ? "rgba(255, 255, 255, 0.08)"
-                          : "rgba(0, 0, 0, 0.06)"
-                      }
-                      strokeDasharray="4 4"
-                      strokeWidth={1}
-                    />
-                  );
-                })}
-
-                <SvgText
-                  x={paddingLeft - 6}
-                  y={paddingTop + 4}
-                  fill={isDark ? "#9CA3AF" : "#64748B"}
-                  fontSize="9"
-                  fontWeight="600"
-                  textAnchor="end"
-                >
-                  {metric.maxY}
-                </SvgText>
-
-                <SvgText
-                  x={paddingLeft - 6}
-                  y={chartHeight - paddingBottom + 2}
-                  fill={isDark ? "#9CA3AF" : "#64748B"}
-                  fontSize="9"
-                  fontWeight="600"
-                  textAnchor="end"
-                >
-                  {metric.minY}
-                </SvgText>
-
-                {areaPath !== "" && (
-                  <Path d={areaPath} fill="url(#chartGradient)" />
-                )}
-
-                {linePath !== "" && (
-                  <Path
-                    d={linePath}
-                    fill="none"
-                    stroke={metric.color}
-                    strokeWidth={2.5}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                )}
-
-                {points.map((pt, idx) => {
-                  const isSelected = idx === selectedPointIndex;
-                  return (
-                    <React.Fragment key={idx}>
-                      {isSelected && (
+                  {points.map((pt, idx) => {
+                    const isSelected = idx === selectedPointIndex;
+                    return (
+                      <React.Fragment key={idx}>
+                        {isSelected && (
+                          <Circle
+                            cx={pt.x}
+                            cy={pt.y}
+                            r={8}
+                            fill={metric.color}
+                            fillOpacity={0.25}
+                          />
+                        )}
                         <Circle
                           cx={pt.x}
                           cy={pt.y}
-                          r={8}
-                          fill={metric.color}
-                          fillOpacity={0.25}
+                          r={isSelected ? 4.5 : 3}
+                          fill={isSelected ? "#FFFFFF" : metric.color}
+                          stroke={metric.color}
+                          strokeWidth={isSelected ? 2.5 : 1.5}
+                          onPress={() => setSelectedPointIndex(idx)}
                         />
-                      )}
-                      <Circle
-                        cx={pt.x}
-                        cy={pt.y}
-                        r={isSelected ? 4.5 : 3}
-                        fill={isSelected ? "#FFFFFF" : metric.color}
-                        stroke={metric.color}
-                        strokeWidth={isSelected ? 2.5 : 1.5}
-                        onPress={() => setSelectedPointIndex(idx)}
-                      />
-                      <SvgText
-                        x={pt.x}
-                        y={chartHeight - 8}
-                        fill={
-                          isSelected
-                            ? isDark
-                              ? "#34D399"
-                              : "#059669"
-                            : isDark
-                              ? "#9CA3AF"
-                              : "#64748B"
-                        }
-                        fontSize="10"
-                        fontWeight={isSelected ? "800" : "500"}
-                        textAnchor="middle"
-                      >
-                        {pt.data.day}
-                      </SvgText>
-                    </React.Fragment>
-                  );
-                })}
-              </Svg>
+                        <SvgText
+                          x={pt.x}
+                          y={chartHeight - 8}
+                          fill={
+                            isSelected
+                              ? isDark
+                                ? "#34D399"
+                                : "#059669"
+                              : isDark
+                                ? "#9CA3AF"
+                                : "#64748B"
+                          }
+                          fontSize="10"
+                          fontWeight={isSelected ? "800" : "500"}
+                          textAnchor="middle"
+                        >
+                          {pt.data.day}
+                        </SvgText>
+                      </React.Fragment>
+                    );
+                  })}
+                </Svg>
+              )}
             </View>
 
             <View className="flex-row justify-between items-center pt-2 border-t border-black/5 dark:border-white/5">
@@ -792,31 +888,44 @@ export default function DashboardScreen() {
                 <Text className="text-[10px] text-gray-500">
                   Nilai Rata-rata
                 </Text>
-                <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50">
-                  {(
-                    metric.data.reduce((acc, curr) => acc + curr.value, 0) /
-                    Math.max(metric.data.length, 1)
-                  ).toFixed(1)}{" "}
-                  {metric.unit}
-                </Text>
+                {isLoading ? (
+                  <Skeleton width={50} height={14} borderRadius={4} style={{ marginTop: 2 }} />
+                ) : (
+                  <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50">
+                    {metric.data.length > 0
+                      ? `${(
+                          metric.data.reduce((acc, curr) => acc + curr.value, 0) /
+                          Math.max(metric.data.length, 1)
+                        ).toFixed(1)} ${metric.unit}`
+                      : "-"}
+                  </Text>
+                )}
               </View>
 
               <View>
                 <Text className="text-[10px] text-gray-500">
                   Stabilitas Parameter
                 </Text>
-                <Text className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
-                  98.2% (Konsisten)
-                </Text>
+                {isLoading ? (
+                  <Skeleton width={50} height={14} borderRadius={4} style={{ marginTop: 2 }} />
+                ) : (
+                  <Text className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                    {metric.data.length > 0 ? "98.2% (Konsisten)" : "-"}
+                  </Text>
+                )}
               </View>
 
               <View>
                 <Text className="text-[10px] text-gray-500">
                   Pembaruan Terakhir
                 </Text>
-                <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50">
-                  {lastUpdated}
-                </Text>
+                {isLoading ? (
+                  <Skeleton width={60} height={14} borderRadius={4} style={{ marginTop: 2 }} />
+                ) : (
+                  <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50">
+                    {lastUpdated}
+                  </Text>
+                )}
               </View>
             </View>
           </GlassCard>

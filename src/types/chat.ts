@@ -16,6 +16,8 @@ export interface ChatSuggestion {
 export interface LlmCompletionRequest {
   history: ChatMessage[];
   message: string;
+  ip?: string;
+  port?: string;
 }
 
 export interface LlmCompletionResponse {

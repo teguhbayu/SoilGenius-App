@@ -1,0 +1,2 @@
+patchedDependencies:
+  expo-notifications: patches/expo-notifications.patch

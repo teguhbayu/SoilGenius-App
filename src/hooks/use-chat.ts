@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChatMessage } from '@/types/chat';
 import { requestLlmCompletion } from '@/services/llm';
+import { useSettings } from '@/hooks/use-settings';
+import { useToast } from '@/hooks/use-toast';
 
 const STORAGE_KEY = '@soilgenius_chat_logs_v1';
 
@@ -9,11 +11,16 @@ const INITIAL_WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome_initial_001',
   role: 'assistant',
   content:
-    'Halo! Saya asisten agronomi cerdas SoilGenius. Saya siap membantu Anda menganalisis kondisi tanah, rekomendasi tanaman, dosis pemupukan, dan teknik aerasi tanah. Ada yang ingin Anda diskusikan hari ini?',
+    'Halo! Saya asisten agronomi cerdas SoilGenius. Saya siap membantu Anda menganalisis kondisi tanah lahan, rekomendasi tanaman, dosis pemupukan, dan teknik perawatan tanah. Ada yang ingin Anda tanyakan seputar lahan atau tanaman Anda hari ini?',
   createdAt: Date.now(),
 };
 
-export function useChat() {
+export function useChat(options?: { ip?: string; port?: string }) {
+  const { config } = useSettings();
+  const toast = useToast();
+  const ip = options?.ip ?? config.apiServerIp;
+  const port = options?.port ?? config.apiServerPort;
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isReady, setIsReady] = useState<boolean>(false);
@@ -70,6 +77,8 @@ export function useChat() {
         const response = await requestLlmCompletion({
           history: updatedHistory,
           message: trimmed,
+          ip,
+          port,
         });
 
         const assistantMessage: ChatMessage = {
@@ -82,12 +91,17 @@ export function useChat() {
         const finalHistory = [...updatedHistory, assistantMessage];
         setMessages(finalHistory);
         await persistMessages(finalHistory);
-      } catch {
+      } catch (err: any) {
+        console.error('Chat error:', err);
+        toast.error(err?.message || 'Gagal menghubungi asisten AI');
+
         const errorMessage: ChatMessage = {
           id: `assistant_err_${Date.now()}`,
           role: 'assistant',
           content:
-            'Maaf, terjadi kendala saat memproses jawaban. Silakan periksa koneksi atau coba lagi nanti.',
+            err?.message
+              ? `Maaf, terjadi kendala: ${err.message}. Pastikan server aktif atau periksa alamat IP server di menu Pengaturan.`
+              : 'Maaf, terjadi kendala saat memproses jawaban. Silakan periksa koneksi atau coba lagi nanti.',
           createdAt: Date.now(),
         };
         const finalHistory = [...updatedHistory, errorMessage];
@@ -97,14 +111,15 @@ export function useChat() {
         setIsLoading(false);
       }
     },
-    [messages, isLoading, persistMessages]
+    [messages, isLoading, persistMessages, ip, port, toast]
   );
 
   const clearHistory = useCallback(async () => {
     const reset = [INITIAL_WELCOME_MESSAGE];
     setMessages(reset);
     await persistMessages(reset);
-  }, [persistMessages]);
+    toast.info('Riwayat percakapan telah dibersihkan');
+  }, [persistMessages, toast]);
 
   const deleteMessage = useCallback(
     async (id: string) => {

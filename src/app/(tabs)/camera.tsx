@@ -1,5 +1,6 @@
 import { SafeAreaView } from "@/components/ui/styled";
 import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import {
   ArrowRight,
@@ -11,6 +12,7 @@ import {
   Database,
   FlipHorizontal,
   History,
+  Image as ImageIcon,
   RotateCcw,
   Scan,
   Sparkles,
@@ -19,6 +21,7 @@ import {
 } from "lucide-react-native";
 import { useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   Pressable,
@@ -29,22 +32,54 @@ import {
 
 import { GlassCard } from "@/components/ui/glass-card";
 import { MeshBackground } from "@/components/ui/mesh-background";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useSettings } from "@/hooks/use-settings";
+import { useToast } from "@/hooks/use-toast";
+import { uploadSoilPhoto } from "@/services/soil-data";
 
 const { width: screenWidth } = Dimensions.get("window");
+
+async function uriToBase64(uri: string): Promise<string> {
+  if (uri.startsWith("data:image/")) return uri;
+
+  try {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        if (result) {
+          resolve(result);
+        } else {
+          reject(new Error("Gagal mengonversi foto"));
+        }
+      };
+      reader.onerror = () => reject(new Error("Gagal membaca foto"));
+      reader.readAsDataURL(blob);
+    });
+  } catch (e: any) {
+    throw new Error("Gagal memproses foto: " + (e?.message || ""));
+  }
+}
 
 export default function CameraScreen() {
   const router = useRouter();
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
   const colors = Colors[isDark ? "dark" : "light"];
+  const { config } = useSettings();
+  const toast = useToast();
 
   const [facing, setFacing] = useState<CameraType>("back");
   const [torch, setTorch] = useState<boolean>(false);
   const [permission, requestPermission] = useCameraPermissions();
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [capturedBase64, setCapturedBase64] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState<boolean>(false);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
 
   const cameraRef = useRef<CameraView>(null);
 
@@ -63,12 +98,18 @@ export default function CameraScreen() {
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.85,
           skipProcessing: false,
+          base64: true,
         });
         if (photo?.uri) {
           setCapturedPhoto(photo.uri);
+          setCapturedBase64(
+            photo.base64 ? `data:image/jpeg;base64,${photo.base64}` : null
+          );
+          toast.success("Foto berhasil diambil!");
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to take picture:", err);
+        toast.error("Gagal mengambil foto: " + (err?.message || ""));
       } finally {
         setIsCapturing(false);
       }
@@ -79,10 +120,61 @@ export default function CameraScreen() {
     setCapturedPhoto(
       "https://images.unsplash.com/photo-1530968033775-2c92736b131e?w=800&auto=format&fit=crop&q=80",
     );
+    setCapturedBase64(null);
+    toast.info("Menggunakan simulasi foto tanaman");
+  };
+
+  const handlePickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.85,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setCapturedPhoto(asset.uri);
+        setCapturedBase64(
+          asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : null,
+        );
+        toast.success("Foto tanah berhasil dipilih dari galeri!");
+      }
+    } catch (err: any) {
+      console.error("Failed to pick image:", err);
+      toast.error("Gagal memilih foto: " + (err?.message || ""));
+    }
   };
 
   const handleRetake = () => {
     setCapturedPhoto(null);
+    setCapturedBase64(null);
+  };
+
+  const handleUploadAndAnalyze = async () => {
+    if (!capturedPhoto || isUploading) return;
+
+    try {
+      setIsUploading(true);
+      let base64ToSend = capturedBase64;
+      if (!base64ToSend) {
+        base64ToSend = await uriToBase64(capturedPhoto);
+      }
+
+      await uploadSoilPhoto(base64ToSend, {
+        ip: config.apiServerIp,
+        port: config.apiServerPort,
+      });
+
+      toast.success("Foto berhasil diunggah! Membuka Diagnosa AI...");
+      router.push("/ai");
+    } catch (err: any) {
+      console.error("Failed to upload photo:", err);
+      toast.error(err?.message || "Gagal mengunggah foto ke server");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -107,12 +199,15 @@ export default function CameraScreen() {
             </Text>
           </View>
 
-          <View className="flex-row items-center gap-1.5 py-1 px-2.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/25">
-            <View className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          <Pressable
+            onPress={handlePickImage}
+            className="flex-row items-center gap-1.5 py-1.5 px-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/25 active:opacity-70"
+          >
+            <ImageIcon size={14} color="#059669" />
             <Text className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
-              AI Ready
+              Galeri
             </Text>
-          </View>
+          </Pressable>
         </View>
 
         {capturedPhoto ? (
@@ -129,7 +224,7 @@ export default function CameraScreen() {
                 <View className="flex-row items-center gap-1.5">
                   <CheckCircle2 size={16} color="#059669" />
                   <Text className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
-                    Foto Berhasil Diambil
+                    Foto Berhasil Dipilih
                   </Text>
                 </View>
                 <Text className="text-[11px] text-gray-500">
@@ -145,22 +240,47 @@ export default function CameraScreen() {
                 />
               </View>
 
-              <View className="flex-row gap-3">
+              <View className="flex-row gap-2.5">
                 <Pressable
                   onPress={handleRetake}
-                  className="flex-1 flex-row items-center justify-center gap-2 py-3 rounded-2xl border border-black/10 dark:border-white/20 bg-white/90 dark:bg-white/10 active:opacity-70"
+                  className="flex-1 flex-row items-center justify-center gap-1.5 py-3 rounded-2xl border border-black/10 dark:border-white/20 bg-white/90 dark:bg-white/10 active:opacity-70"
                 >
-                  <RotateCcw size={18} color={colors.text} />
-                  <Text className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">
+                  <RotateCcw size={16} color={colors.text} />
+                  <Text className="text-xs font-semibold text-emerald-950 dark:text-emerald-50">
                     Foto Ulang
                   </Text>
                 </Pressable>
 
-                <Pressable className="flex-[1.2] flex-row items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-600 shadow-sm active:opacity-85">
-                  <Text className="text-sm font-bold text-white">
-                    Siap Analisis
+                <Pressable
+                  onPress={handlePickImage}
+                  className="flex-1 flex-row items-center justify-center gap-1.5 py-3 rounded-2xl border border-emerald-500/30 bg-white/90 dark:bg-white/10 active:opacity-70"
+                >
+                  <ImageIcon size={16} color={colors.primary} />
+                  <Text className="text-xs font-semibold text-emerald-950 dark:text-emerald-50">
+                    Ganti Galeri
                   </Text>
-                  <ArrowRight size={18} color="#FFFFFF" />
+                </Pressable>
+
+                <Pressable
+                  onPress={handleUploadAndAnalyze}
+                  disabled={isUploading}
+                  className="flex-[1.4] flex-row items-center justify-center gap-1.5 py-3 rounded-2xl bg-emerald-600 shadow-sm active:opacity-85"
+                >
+                  {isUploading ? (
+                    <>
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                      <Text className="text-xs font-bold text-white">
+                        Mengunggah...
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text className="text-xs font-bold text-white">
+                        Siap Analisis
+                      </Text>
+                      <ArrowRight size={16} color="#FFFFFF" />
+                    </>
+                  )}
                 </Pressable>
               </View>
             </GlassCard>
@@ -267,8 +387,29 @@ export default function CameraScreen() {
         ) : (
           <View className="flex-1 px-4 pb-20 max-w-[500px] self-center w-full">
             {!permission ? (
-              <View className="flex-1 items-center justify-center">
-                <Text className="text-gray-500">Memeriksa izin kamera...</Text>
+              <View className="flex-1 py-4">
+                <GlassCard
+                  glowColor="#10B981"
+                  borderColor="rgba(16, 185, 129, 0.3)"
+                  contentClassName="p-5 rounded-[28px] flex-1 justify-between items-center"
+                >
+                  <View className="w-full flex-row justify-between items-center">
+                    <Skeleton width={40} height={40} borderRadius={20} />
+                    <Skeleton width={120} height={28} borderRadius={14} />
+                    <Skeleton width={40} height={40} borderRadius={20} />
+                  </View>
+
+                  <View className="items-center gap-3">
+                    <Skeleton width={80} height={80} borderRadius={40} />
+                    <Skeleton width={180} height={14} borderRadius={6} />
+                  </View>
+
+                  <View className="w-full flex-row justify-around items-center pb-2">
+                    <Skeleton width={44} height={44} borderRadius={22} />
+                    <Skeleton width={72} height={72} borderRadius={36} />
+                    <Skeleton width={44} height={44} borderRadius={22} />
+                  </View>
+                </GlassCard>
               </View>
             ) : !permission.granted ? (
               <View className="flex-1 items-center justify-center">
@@ -294,6 +435,16 @@ export default function CameraScreen() {
                   >
                     <Text className="text-white font-bold text-sm">
                       Izinkan Akses Kamera
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={handlePickImage}
+                    className="w-full py-3.5 rounded-2xl bg-white/90 dark:bg-white/10 border border-emerald-500/30 items-center flex-row justify-center gap-2 mt-2 active:opacity-70"
+                  >
+                    <ImageIcon size={18} color={colors.primary} />
+                    <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50">
+                      Pilih Foto dari Galeri
                     </Text>
                   </Pressable>
 
@@ -409,7 +560,12 @@ export default function CameraScreen() {
                           </View>
                         </Pressable>
 
-                        <View className="w-11" />
+                        <Pressable
+                          onPress={handlePickImage}
+                          className="w-11 h-11 rounded-full items-center justify-center bg-black/50 border border-white/25 active:opacity-70"
+                        >
+                          <ImageIcon size={18} color="#FFFFFF" />
+                        </Pressable>
                       </View>
                     </View>
                   </CameraView>

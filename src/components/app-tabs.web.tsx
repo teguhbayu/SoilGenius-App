@@ -8,7 +8,7 @@ import {
   TabListProps,
 } from 'expo-router/ui';
 import { Pressable, useColorScheme, View, StyleSheet, Text } from 'react-native';
-import { LayoutDashboard, Camera, Settings, Leaf } from 'lucide-react-native';
+import { LayoutDashboard, Camera, Settings, Leaf, MessageSquare, SlidersHorizontal } from 'lucide-react-native';
 
 import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 
@@ -23,6 +23,12 @@ export default function AppTabs() {
           </TabTrigger>
           <TabTrigger name="camera" href="/camera" asChild>
             <TabButton icon={Camera}>Kamera</TabButton>
+          </TabTrigger>
+          <TabTrigger name="chat" href="/chat" asChild>
+            <TabButton icon={MessageSquare}>Chat AI</TabButton>
+          </TabTrigger>
+          <TabTrigger name="actuator" href="/actuator" asChild>
+            <TabButton icon={SlidersHorizontal}>Aktuator</TabButton>
           </TabTrigger>
           <TabTrigger name="settings" href="/settings" asChild>
             <TabButton icon={Settings}>Pengaturan</TabButton>

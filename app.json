@@ -19,7 +19,8 @@
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
@@ -40,6 +41,13 @@
         "expo-camera",
         {
           "cameraPermission": "Izinkan aplikasi mengakses kamera untuk mengambil foto tanaman"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#10B981"
         }
       ]
     ],

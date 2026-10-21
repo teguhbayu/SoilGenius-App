@@ -40,6 +40,15 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="actuator">
+        <NativeTabs.Trigger.Label>Aktuator</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          src={require('@/assets/images/tabIcons/settings.png')}
+          sf={{ default: 'slider.horizontal.3', selected: 'slider.horizontal.3' }}
+          md={{ default: 'tune', selected: 'tune' }}
+        />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="settings">
         <NativeTabs.Trigger.Label>Pengaturan</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon

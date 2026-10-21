@@ -1,0 +1,41 @@
+diff --git a/build/TopicSubscriptionModule.android.js b/build/TopicSubscriptionModule.android.js
+index 644a8bb61d46483402fe81a502883e3871782586..b9fc7d72f91ee7c9721fe3f358d0984851703a82 100644
+--- a/build/TopicSubscriptionModule.android.js
++++ b/build/TopicSubscriptionModule.android.js
+@@ -1,3 +1,13 @@
+-import { requireNativeModule } from 'expo-modules-core';
+-export default requireNativeModule('ExpoTopicSubscriptionModule');
++import { requireOptionalNativeModule } from 'expo-modules-core';
++
++const nativeModule = requireOptionalNativeModule('ExpoTopicSubscriptionModule');
++
++const fallbackModule = {
++  addListener: () => {},
++  removeListeners: () => {},
++  subscribeToTopicAsync: () => Promise.resolve(null),
++  unsubscribeFromTopicAsync: () => Promise.resolve(null),
++};
++
++export default nativeModule || fallbackModule;
+ //# sourceMappingURL=TopicSubscriptionModule.android.js.map
+diff --git a/src/TopicSubscriptionModule.android.ts b/src/TopicSubscriptionModule.android.ts
+index 2b9ed573a47cef45091c6b5ea1d116fd92d1531b..08231276f2fd1ab43e955cb8722682f1cc68a615 100644
+--- a/src/TopicSubscriptionModule.android.ts
++++ b/src/TopicSubscriptionModule.android.ts
+@@ -1,5 +1,14 @@
+-import { requireNativeModule } from 'expo-modules-core';
++import { requireOptionalNativeModule } from 'expo-modules-core';
+ 
+ import type { TopicSubscriptionModule } from './TopicSubscriptionModule.types';
+ 
+-export default requireNativeModule<TopicSubscriptionModule>('ExpoTopicSubscriptionModule');
++const nativeModule = requireOptionalNativeModule<TopicSubscriptionModule>('ExpoTopicSubscriptionModule');
++
++const fallbackModule: TopicSubscriptionModule = {
++  addListener: () => {},
++  removeListeners: () => {},
++  subscribeToTopicAsync: () => Promise.resolve(null),
++  unsubscribeFromTopicAsync: () => Promise.resolve(null),
++};
++
++export default nativeModule || fallbackModule;

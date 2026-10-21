@@ -5,6 +5,8 @@ import {
   MetricType,
   MetricConfig,
   MetricDataPoint,
+  SoilAiAnalysis,
+  SoilAiApiResponse,
 } from '@/types/soil';
 
 let isAndroid = false;
@@ -324,4 +326,90 @@ export function formatLastUpdated(date: Date): string {
   const day = date.getDate();
   const month = MONTHS_ID[date.getMonth()] || '';
   return `${day} ${month}, ${hours}:${minutes} WIB`;
+}
+
+export async function fetchSoilAiAnalysis(options?: {
+  ip?: string;
+  port?: string;
+}): Promise<SoilAiAnalysis | null> {
+  const candidates = getCandidateBaseUrls(options?.ip, options?.port);
+
+  let lastError: Error | null = null;
+
+  for (const baseUrl of candidates) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+      const url = `${baseUrl}/api/v1/ai`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error ${response.status}`);
+      }
+
+      const json: SoilAiApiResponse = await response.json();
+
+      if (json && json.data) {
+        cachedWorkingBaseUrl = baseUrl;
+        return json.data;
+      }
+    } catch (err: any) {
+      lastError = err;
+    }
+  }
+
+  return null;
+}
+
+export async function uploadSoilPhoto(
+  base64OrDataUrl: string,
+  options?: { ip?: string; port?: string }
+): Promise<SoilDataRecord> {
+  const candidates = getCandidateBaseUrls(options?.ip, options?.port);
+
+  let lastError: Error | null = null;
+
+  for (const baseUrl of candidates) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+      const url = `${baseUrl}/api/v1/data/photo`;
+      const response = await fetch(url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ photo: base64OrDataUrl }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => null);
+        throw new Error(errJson?.message || `HTTP error ${response.status}`);
+      }
+
+      const json = await response.json();
+      if (json && json.data) {
+        cachedWorkingBaseUrl = baseUrl;
+        return json.data;
+      }
+    } catch (err: any) {
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error("Gagal mengunggah foto ke API server");
 }
