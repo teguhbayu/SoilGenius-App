@@ -4,18 +4,16 @@
     "slug": "SoilGenius",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/soilgenius.png",
     "scheme": "soilgenius",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/soilgenius.png"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#ECFDF5",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/images/soilgenius.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
@@ -39,9 +37,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/images/soilgenius.png",
+          "imageWidth": 160
         }
       ],
       [
@@ -53,7 +51,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
+          "icon": "./assets/images/soilgenius.png",
           "color": "#10B981"
         }
       ],
