@@ -8,18 +8,19 @@ import {
 } from 'react-native';
 import { SafeAreaView } from '@/components/ui/styled';
 import { MeshBackground } from '@/components/ui/mesh-background';
-import { useActuatorConfig } from '@/hooks/use-actuator-config';
+import { useIotHub } from '@/hooks/use-iot-hub';
 import { useToast } from '@/hooks/use-toast';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { ActuatorHeader } from '@/components/actuator/actuator-header';
-import { ActuatorMasterCard } from '@/components/actuator/actuator-master-card';
-import { ActuatorCard } from '@/components/actuator/actuator-card';
-import { ActuatorLogsCard } from '@/components/actuator/actuator-logs-card';
+import { ServerHubStatusCard } from '@/components/actuator/server-hub-status-card';
+import { ActuatorHardwareCard } from '@/components/actuator/actuator-hardware-card';
+import { ScheduleManagerCard } from '@/components/actuator/schedule-manager-card';
+import { RulesManagerCard } from '@/components/actuator/rules-manager-card';
+import { BleProvisioningModal } from '@/components/actuator/ble-provisioning-modal';
 import { ActuatorScreenSkeleton } from '@/components/actuator/actuator-skeleton';
-import { ActuatorType } from '@/types/actuator';
-
-type FilterCategory = 'all' | ActuatorType;
+import { AlertOctagon, Zap } from 'lucide-react-native';
+import { GlassCard } from '@/components/ui/glass-card';
 
 export default function ActuatorTabScreen() {
   const scheme = useColorScheme();
@@ -28,89 +29,157 @@ export default function ActuatorTabScreen() {
   const toast = useToast();
 
   const {
-    actuators,
-    systemSettings,
-    logs,
+    devices,
+    actuatorDevice,
+    rules,
+    schedules,
     isLoading,
-    isSaving,
-    toggleActuatorActive,
-    updateActuator,
-    updateSystemSettings,
-    triggerTestPulse,
-    saveAllConfig,
-    resetToDefault,
-  } = useActuatorConfig();
+    isRefreshing,
+    serverOnline,
+    loadHubData,
+    toggleRelay,
+    openPumpManually,
+    closePumpManually,
+    triggerPulse,
+    triggerEmergency,
+    handleToggleRule,
+    handleCreateRule,
+    handleDeleteRule,
+    handleToggleSchedule,
+    handleCreateSchedule,
+    handleDeleteSchedule,
+    handleUnpairDevice,
+  } = useIotHub();
 
-  const [selectedFilter, setSelectedFilter] = useState<FilterCategory>('all');
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [isBleModalVisible, setIsBleModalVisible] = useState<boolean>(false);
+  const [isEmergencyActive, setIsEmergencyActive] = useState<boolean>(false);
 
   const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setIsRefreshing(false);
-    toast.info('Status relai diperbarui');
-  }, [toast]);
+    await loadHubData(true);
+    toast.info('Status server hub, pompa & jadwal diperbarui');
+  }, [loadHubData, toast]);
 
-  const handleSave = async () => {
+  const handleToggle = async (
+    deviceId: string,
+    relayKey: string,
+    currentState: boolean,
+    durationSeconds?: number
+  ) => {
     try {
-      await saveAllConfig();
-      toast.success('Konfigurasi aktuator berhasil disimpan!');
+      await toggleRelay(deviceId, relayKey, currentState, durationSeconds);
+      toast.success(
+        currentState
+          ? 'Perintah mematikan pompa dikirim'
+          : `Perintah menyalakan pompa (${durationSeconds ? durationSeconds + 's' : 'Manual'}) dikirim`
+      );
     } catch (err: any) {
-      toast.error(err?.message || 'Gagal menyimpan konfigurasi');
+      toast.error(err.message || 'Gagal mengirim perintah ke server');
     }
   };
 
-  const handleReset = async () => {
-    await resetToDefault();
-    toast.info('Konfigurasi dikembalikan ke standar awal');
-  };
-
-  const handleToggle = (id: string) => {
-    if (systemSettings.emergencyStop) {
-      toast.error('Buka kunci Emergency Stop terlebih dahulu.');
-      return;
-    }
-    const item = actuators.find((a) => a.id === id);
-    toggleActuatorActive(id);
-    if (item) {
-      const willBeActive = !item.isActive;
-      if (willBeActive) {
-        toast.success(`${item.name} dinyalakan`);
-      } else {
-        toast.info(`${item.name} dimatikan`);
-      }
+  const handleOpenPump = async (deviceId: string, durationSeconds?: number) => {
+    try {
+      await openPumpManually(deviceId, durationSeconds);
+      toast.success(
+        `Perintah BUKA POMPA (${durationSeconds ? durationSeconds + 's' : 'Manual'}) dikirim ke server via MQTT`
+      );
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal membuka pompa');
     }
   };
 
-  const handleEmergencyStopToggle = () => {
-    const nextState = !systemSettings.emergencyStop;
-    updateSystemSettings({ emergencyStop: nextState });
-    if (nextState) {
-      toast.error('EMERGENCY STOP DIAKTIFKAN! Seluruh relai diputus.');
-    } else {
-      toast.success('Sistem darurat dilepas. Kontrol relai kembali normal.');
+  const handleClosePump = async (deviceId: string) => {
+    try {
+      await closePumpManually(deviceId);
+      toast.info('Perintah TUTUP POMPA (Matikan) dikirim ke server via MQTT');
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal menutup pompa');
     }
   };
 
-  const handleTestPulse = (id: string) => {
-    const item = actuators.find((a) => a.id === id);
-    triggerTestPulse(id, 5);
-    toast.info(`Menjalankan tes pulsa 5 detik untuk ${item?.name || 'aktuator'}...`);
+  const handleTestPulse = async (deviceId: string, relayKey: string) => {
+    try {
+      await triggerPulse(deviceId, relayKey, 5);
+      toast.info('Perintah tes pulsa 5s dikirim via MQTT QOS-1');
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal mengirim tes pulsa');
+    }
   };
 
-  const filterOptions: { id: FilterCategory; label: string }[] = [
-    { id: 'all', label: 'Semua' },
-    { id: 'water_pump', label: 'Irigasi' },
-    { id: 'fertilizer_pump', label: 'Nutrisi' },
-    { id: 'ph_doser', label: 'Buffer pH' },
-    { id: 'cooling_fan', label: 'Aerasi' },
-    { id: 'mist_sprayer', label: 'Pengabut' },
-  ];
+  const handleEmergencyStop = async () => {
+    try {
+      setIsEmergencyActive(true);
+      await triggerEmergency();
+      toast.error('EMERGENCY STOP DIAKTIFKAN! Pompa diputus.');
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal memicu emergency stop');
+    }
+  };
 
-  const filteredActuators =
-    selectedFilter === 'all'
-      ? actuators
-      : actuators.filter((a) => a.type === selectedFilter);
+  const handleToggleRuleClick = async (ruleId: string) => {
+    try {
+      await handleToggleRule(ruleId);
+      toast.success('Status aturan otomasi berhasil diubah');
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal mengubah aturan');
+    }
+  };
+
+  const handleCreateRuleSubmit = async (ruleData: any) => {
+    try {
+      await handleCreateRule(ruleData);
+      toast.success('Aturan otomasi server berhasil disimpan');
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal membuat aturan baru');
+      throw err;
+    }
+  };
+
+  const handleDeleteRuleClick = async (ruleId: string) => {
+    try {
+      await handleDeleteRule(ruleId);
+      toast.info('Aturan otomasi dihapus');
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal menghapus aturan');
+    }
+  };
+
+  const handleToggleScheduleClick = async (scheduleId: string) => {
+    try {
+      await handleToggleSchedule(scheduleId);
+      toast.success('Status jadwal penyiraman diperbarui');
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal mengubah status jadwal');
+    }
+  };
+
+  const handleCreateScheduleSubmit = async (scheduleData: any) => {
+    try {
+      await handleCreateSchedule(scheduleData);
+      toast.success('Jadwal penyiraman berhasil disimpan di server');
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal membuat jadwal baru');
+      throw err;
+    }
+  };
+
+  const handleDeleteScheduleClick = async (scheduleId: string) => {
+    try {
+      await handleDeleteSchedule(scheduleId);
+      toast.info('Jadwal penyiraman dihapus dari server');
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal menghapus jadwal');
+    }
+  };
+
+  const handleUnpair = async (deviceId: string) => {
+    try {
+      await handleUnpairDevice(deviceId);
+      toast.info('Perangkat aktuator berhasil dihapus');
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal menghapus perangkat');
+    }
+  };
 
   return (
     <View className="flex-1">
@@ -118,9 +187,9 @@ export default function ActuatorTabScreen() {
 
       <SafeAreaView className="flex-1" edges={['top', 'left', 'right']}>
         <ActuatorHeader
-          onReset={handleReset}
-          onSave={handleSave}
-          isSaving={isSaving}
+          onReset={handleRefresh}
+          onSave={handleRefresh}
+          isSaving={isRefreshing}
         />
 
         <ScrollView
@@ -139,66 +208,92 @@ export default function ActuatorTabScreen() {
             <ActuatorScreenSkeleton />
           ) : (
             <>
-              {/* Master Control & Safety Card */}
-              <ActuatorMasterCard
-                settings={systemSettings}
-                actuators={actuators}
-                onUpdateSettings={updateSystemSettings}
-                onEmergencyStop={handleEmergencyStopToggle}
+              {/* Emergency Stop Card */}
+              <GlassCard
+                glowColor={isEmergencyActive ? '#EF4444' : '#10B981'}
+                borderColor={isEmergencyActive ? 'rgba(239, 68, 68, 0.4)' : 'rgba(16, 185, 129, 0.25)'}
+                contentClassName="p-3.5 rounded-[22px] flex-row items-center justify-between gap-2"
+              >
+                <View className="flex-row items-center gap-2.5 flex-1 min-w-0 pr-1">
+                  <View className="w-8 h-8 rounded-xl items-center justify-center bg-red-500/15 shrink-0">
+                    <AlertOctagon size={16} color="#EF4444" />
+                  </View>
+                  <View className="flex-1 min-w-0">
+                    <Text
+                      className="text-xs font-bold text-emerald-950 dark:text-emerald-50"
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      Sistem Pengaman Darurat
+                    </Text>
+                    <Text
+                      className="text-[10px] text-gray-500 dark:text-gray-400"
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      Putus daya pompa & relai seketika
+                    </Text>
+                  </View>
+                </View>
+
+                <Pressable
+                  onPress={handleEmergencyStop}
+                  className="px-3 py-2 rounded-xl bg-red-600 flex-row items-center gap-1.5 active:opacity-85 shadow-sm shrink-0"
+                >
+                  <AlertOctagon size={13} color="#FFFFFF" />
+                  <Text className="text-xs font-bold text-white">E-STOP</Text>
+                </Pressable>
+              </GlassCard>
+
+              {/* 1. Server Hub & Nodes Architecture Card */}
+              <ServerHubStatusCard
+                serverOnline={serverOnline}
+                actuatorDevice={actuatorDevice}
+                onOpenBlePairing={() => setIsBleModalVisible(true)}
+                onUnpairDevice={handleUnpair}
               />
 
-              {/* Category Filter Pills */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerClassName="gap-2 py-1"
-              >
-                {filterOptions.map((opt) => {
-                  const isSelected = selectedFilter === opt.id;
-                  return (
-                    <Pressable
-                      key={opt.id}
-                      onPress={() => setSelectedFilter(opt.id)}
-                      className={`px-3.5 py-1.5 rounded-full border ${
-                        isSelected
-                          ? 'bg-emerald-600 border-emerald-600'
-                          : 'bg-white/80 dark:bg-white/[0.06] border-black/10 dark:border-white/10'
-                      }`}
-                    >
-                      <Text
-                        className={`text-xs font-bold ${
-                          isSelected
-                            ? 'text-white'
-                            : 'text-gray-700 dark:text-gray-300'
-                        }`}
-                      >
-                        {opt.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
+              {/* 2. Actuator Hardware Card (Manual Open / Close & State) */}
+              <ActuatorHardwareCard
+                device={actuatorDevice}
+                onToggleRelay={handleToggle}
+                onOpenPump={handleOpenPump}
+                onClosePump={handleClosePump}
+                onTriggerPulse={handleTestPulse}
+                onOpenBlePairing={() => setIsBleModalVisible(true)}
+              />
 
-              {/* Actuator Cards List */}
-              <View className="gap-3.5">
-                {filteredActuators.map((actuator) => (
-                  <ActuatorCard
-                    key={actuator.id}
-                    actuator={actuator}
-                    isEmergencyLocked={systemSettings.emergencyStop}
-                    onToggleActive={handleToggle}
-                    onUpdate={updateActuator}
-                    onTestPulse={handleTestPulse}
-                  />
-                ))}
-              </View>
+              {/* 3. Server-Side Pump Irrigation Schedules (Open / Close Schedule) */}
+              <ScheduleManagerCard
+                schedules={schedules}
+                actuatorDeviceId={actuatorDevice?.id || ''}
+                onToggleSchedule={handleToggleScheduleClick}
+                onCreateSchedule={handleCreateScheduleSubmit}
+                onDeleteSchedule={handleDeleteScheduleClick}
+              />
 
-              {/* Logs Card */}
-              <ActuatorLogsCard logs={logs} />
+              {/* 4. Server-Side Automation Rules Manager */}
+              <RulesManagerCard
+                rules={rules}
+                actuatorDeviceId={actuatorDevice?.id || ''}
+                onToggleRule={handleToggleRuleClick}
+                onCreateRule={handleCreateRuleSubmit}
+                onDeleteRule={handleDeleteRuleClick}
+              />
             </>
           )}
         </ScrollView>
       </SafeAreaView>
+
+      {/* BLE Provisioning & Wi-Fi Claim Modal */}
+      <BleProvisioningModal
+        visible={isBleModalVisible}
+        onClose={() => setIsBleModalVisible(false)}
+        onSuccess={() => {
+          loadHubData(false);
+          toast.success('Actuator ESP32 berhasil dipasangkan ke Server Hub!');
+        }}
+      />
     </View>
   );
 }

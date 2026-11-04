@@ -66,6 +66,8 @@ export interface SoilQualityParam {
 export interface RecommendedCrop {
   name: string;
   latin: string;
+  category?: "sorgum" | "cabai" | "sawi" | "kacang" | "milet" | "lainnya" | string;
+  image?: string;
   compatibility: number;
   badge: string;
   badgeColor?: string;

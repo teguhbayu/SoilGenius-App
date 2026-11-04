@@ -1,2 +1,6 @@
+packages:
+  - '.'
 patchedDependencies:
   expo-notifications: patches/expo-notifications.patch
+minimumReleaseAge: 0
+

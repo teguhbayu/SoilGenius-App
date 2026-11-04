@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "polines",
-    "slug": "polines",
+    "name": "SoilGenius",
+    "slug": "SoilGenius",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "polines",
+    "scheme": "soilgenius",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
@@ -20,8 +20,15 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.POST_NOTIFICATIONS"
-      ]
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "xyz.teguhbayu.SoilGenius"
     },
     "web": {
       "output": "static",
@@ -49,11 +56,31 @@
           "icon": "./assets/images/icon.png",
           "color": "#10B981"
         }
-      ]
+      ],
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "modes": [
+            "central"
+          ],
+          "bluetoothAlwaysPermission": "Izinkan aplikasi mengakses Bluetooth untuk mendeteksi dan memasangkan Actuator ESP32."
+        }
+      ],
+      "expo-font",
+      "expo-image",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c80c03fd-0891-403e-82cb-114363c5dfaf"
+      }
+    },
+    "owner": "teguhbayu"
   }
 }

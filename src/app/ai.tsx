@@ -28,7 +28,8 @@ import {
 import { GlassCard } from "@/components/ui/glass-card";
 import { MeshBackground } from "@/components/ui/mesh-background";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SafeAreaView } from "@/components/ui/styled";
+import { Image, SafeAreaView } from "@/components/ui/styled";
+import { getCropImage } from "@/constants/plants";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useSettings } from "@/hooks/use-settings";
@@ -164,12 +165,17 @@ function AiScreenSkeleton() {
               key={i}
               className="p-3 rounded-2xl bg-white/70 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 gap-2.5"
             >
-              <View className="flex-row justify-between items-start">
-                <View className="gap-1 flex-1 mr-2">
-                  <Skeleton width={110} height={15} borderRadius={4} />
-                  <Skeleton width={80} height={10} borderRadius={3} />
+              <View className="flex-row items-center gap-3">
+                <Skeleton width={56} height={56} borderRadius={12} />
+                <View className="flex-1">
+                  <View className="flex-row justify-between items-start">
+                    <View className="gap-1 flex-1 mr-2">
+                      <Skeleton width={110} height={15} borderRadius={4} />
+                      <Skeleton width={80} height={10} borderRadius={3} />
+                    </View>
+                    <Skeleton width={80} height={20} borderRadius={10} />
+                  </View>
                 </View>
-                <Skeleton width={90} height={20} borderRadius={10} />
               </View>
               <View className="gap-1.5">
                 <Skeleton width="100%" height={11} borderRadius={3} />
@@ -250,22 +256,17 @@ export default function AiScreen() {
 
         if (result) {
           setData(result);
-          if (isManualRefresh) {
-            toast.success("Diagnosa AI berhasil diperbarui!");
-          }
         } else {
-          setData(null);
-          setErrorMessage("Belum ada data diagnosa AI dari server.");
-          if (isManualRefresh) {
-            toast.info("Belum ada data diagnosa dari server.");
-          }
+          setErrorMessage(
+            "Belum ada data analisis AI. Ambil foto tanah terlebih dahulu pada menu Kamera.",
+          );
         }
       } catch (err: any) {
-        console.error("AI Fetch error:", err);
-        setErrorMessage(err?.message || "Gagal menghubungi API server.");
-        if (isManualRefresh) {
-          toast.error("Gagal memuat diagnosa: " + (err?.message || ""));
-        }
+        const msg =
+          err?.message ||
+          "Gagal mengambil hasil analisis AI. Pastikan server API aktif.";
+        setErrorMessage(msg);
+        toast.error(msg);
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
@@ -278,156 +279,185 @@ export default function AiScreen() {
     loadAiData();
   }, [loadAiData]);
 
-  const onRefresh = () => {
+  const onRefresh = useCallback(() => {
     loadAiData(true);
-  };
+  }, [loadAiData]);
 
   return (
-    <View className="flex-1">
+    <View className="flex-1 bg-surface-50 dark:bg-[#07130E]">
       <MeshBackground />
 
       <SafeAreaView className="flex-1" edges={["top", "left", "right"]}>
-        <View className="flex-row items-center justify-between px-4 py-2">
-          <Pressable
-            onPress={() => router.back()}
-            className="w-10 h-10 rounded-full border items-center justify-center bg-white/85 dark:bg-white/10 border-emerald-500/20 dark:border-white/15 active:opacity-70"
-          >
-            <ChevronLeft size={20} color={colors.text} />
-          </Pressable>
+        {/* Header Bar */}
+        <View className="flex-row items-center justify-between px-4 py-3 border-b border-black/5 dark:border-white/5">
+          <View className="flex-row items-center gap-2">
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Kembali"
+              className="w-9 h-9 rounded-full items-center justify-center bg-black/5 dark:bg-white/10 active:opacity-60"
+            >
+              <ChevronLeft size={20} color={colors.text} />
+            </Pressable>
 
-          <View className="flex-1 ml-3">
-            <Text className="text-xl font-extrabold tracking-tight text-emerald-950 dark:text-emerald-50">
-              Diagnosa AI & Telemetri
-            </Text>
-            <Text className="text-xs text-emerald-800/70 dark:text-emerald-300/70">
-              Analisis Komprehensif Lahan Cerdas
-            </Text>
+            <View className="flex-row items-center gap-2">
+              <View className="w-8 h-8 rounded-xl items-center justify-center bg-emerald-500/15">
+                <BrainCircuit size={18} color="#059669" />
+              </View>
+              <View>
+                <Text className="text-base font-black text-emerald-950 dark:text-emerald-50">
+                  AI Soil Analysis
+                </Text>
+                <Text className="text-[10px] text-emerald-700 dark:text-emerald-300 font-semibold">
+                  Sistem Pakar & Bio-Agronomi
+                </Text>
+              </View>
+            </View>
           </View>
 
           <Pressable
-            onPress={onRefresh}
+            onPress={() => loadAiData(true)}
             disabled={isLoading || isRefreshing}
-            className="w-10 h-10 rounded-full border items-center justify-center bg-white/85 dark:bg-white/10 border-emerald-500/20 dark:border-white/15 active:opacity-70"
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh Analisis AI"
+            className="w-9 h-9 rounded-full items-center justify-center bg-black/5 dark:bg-white/10 active:opacity-60"
           >
             {isRefreshing ? (
-              <ActivityIndicator size="small" color={colors.primary} />
+              <ActivityIndicator size="small" color="#059669" />
             ) : (
-              <RefreshCw size={18} color={colors.primary} />
+              <RefreshCw size={16} color={colors.text} />
             )}
           </Pressable>
         </View>
 
         <ScrollView
+          className="flex-1 px-4"
+          contentContainerStyle={{
+            paddingTop: 16,
+            paddingBottom: 40,
+            gap: 16,
+          }}
           showsVerticalScrollIndicator={false}
-          contentContainerClassName="px-4 pt-2 pb-24 max-w-[500px] self-center w-full gap-4"
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={onRefresh}
-              tintColor={colors.primary}
+              tintColor="#059669"
+              colors={["#059669"]}
             />
           }
         >
-          {/* While Loading: Show Skeleton Instead of Default Dummy Data */}
           {isLoading ? (
             <AiScreenSkeleton />
-          ) : !data ? (
-            /* Empty / Not Found State */
-            <GlassCard
-              glowColor="#10B981"
-              contentClassName="p-6 rounded-[24px] items-center text-center gap-3"
-            >
-              <View className="w-14 h-14 rounded-2xl items-center justify-center bg-emerald-100 dark:bg-emerald-950/60 mt-2">
-                <AlertCircle size={28} color="#059669" />
-              </View>
+          ) : errorMessage || !data ? (
+            <View className="py-12 items-center gap-4">
+              <GlassCard
+                glowColor="#EF4444"
+                contentClassName="p-6 rounded-[24px] items-center text-center gap-3"
+              >
+                <View className="w-14 h-14 rounded-2xl items-center justify-center bg-rose-50 dark:bg-rose-950/40">
+                  <AlertCircle size={28} color="#EF4444" />
+                </View>
 
-              <Text className="text-lg font-extrabold text-emerald-950 dark:text-emerald-50 text-center">
-                Belum Ada Hasil Diagnosa AI
-              </Text>
+                <Text className="text-base font-extrabold text-emerald-950 dark:text-emerald-50 text-center">
+                  Data Analisis Belum Tersedia
+                </Text>
 
-              <Text className="text-xs text-gray-600 dark:text-gray-300 text-center leading-relaxed max-w-[320px]">
-                {errorMessage ||
-                  "Sistem belum menemukan hasil analisis tanah. Pastikan kamera telah mengambil foto tanah terbaru untuk mendiagnosa kondisi lahan."}
-              </Text>
+                <Text className="text-xs text-gray-600 dark:text-gray-300 text-center leading-relaxed max-w-[280px]">
+                  {errorMessage ||
+                    "Ambil foto tanah dengan kamera SoilGenius untuk menjalankan sistem pakar AI."}
+                </Text>
 
-              <View className="flex-row gap-3 w-full mt-2">
-                <Pressable
-                  onPress={() => loadAiData(true)}
-                  className="flex-1 py-3 rounded-2xl border border-black/10 dark:border-white/20 bg-white/80 dark:bg-white/10 items-center flex-row justify-center gap-2 active:opacity-70"
-                >
-                  <RotateCcw size={16} color={colors.text} />
-                  <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50">
-                    Coba Lagi
-                  </Text>
-                </Pressable>
+                <View className="flex-row gap-2.5 mt-2">
+                  <Pressable
+                    onPress={() => loadAiData(true)}
+                    className="flex-row items-center gap-1.5 px-4 py-2.5 rounded-xl bg-black/5 dark:bg-white/10 active:opacity-70"
+                  >
+                    <RotateCcw size={14} color={colors.text} />
+                    <Text className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                      Coba Lagi
+                    </Text>
+                  </Pressable>
 
-                <Pressable
-                  onPress={() => router.push("/camera")}
-                  className="flex-[1.2] py-3 rounded-2xl bg-emerald-600 items-center flex-row justify-center gap-2 shadow-sm active:opacity-85"
-                >
-                  <Camera size={16} color="#FFFFFF" />
-                  <Text className="text-xs font-bold text-white">
-                    Ambil Foto
-                  </Text>
-                </Pressable>
-              </View>
-            </GlassCard>
+                  <Pressable
+                    onPress={() => router.push("/camera")}
+                    className="flex-row items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 active:opacity-80"
+                  >
+                    <Camera size={14} color="#FFFFFF" />
+                    <Text className="text-xs font-bold text-white">
+                      Buka Kamera
+                    </Text>
+                  </Pressable>
+                </View>
+              </GlassCard>
+            </View>
           ) : (
-            /* Render Live AI Diagnosed Data */
             <>
-              {/* Card 1: Kesimpulan Hasil Data & Klasifikasi Tanah */}
+              {/* Card 1: Diagnosa & Kesimpulan Komprehensif */}
               <GlassCard
                 glowColor="#10B981"
-                contentClassName="p-4 rounded-[22px] gap-3"
+                contentClassName="p-4 rounded-[22px] gap-3.5"
               >
+                {/* Header Card Diagnosa */}
                 <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center gap-2 flex-1 mr-2">
+                  <View className="flex-row items-center gap-2">
                     <View className="w-8 h-8 rounded-xl items-center justify-center bg-emerald-100 dark:bg-emerald-950/60">
-                      <BrainCircuit size={18} color="#059669" />
+                      <Sparkles size={18} color="#059669" />
                     </View>
-                    <View className="flex-1">
+                    <View>
                       <Text className="text-base font-extrabold text-emerald-950 dark:text-emerald-50">
-                        Kesimpulan Hasil Data
+                        Diagnosa Kondisi Tanah
                       </Text>
                       <Text className="text-[11px] text-emerald-800/70 dark:text-emerald-300/70">
-                        Sintesis Diagnosa AI & Algoritma Agronomi
+                        Analisis Telemetri & Citra Visual
                       </Text>
                     </View>
-                  </View>
-
-                  <View className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                    <Sparkles size={14} color="#059669" />
-                    <Text className="text-[11px] font-bold text-emerald-800 dark:text-emerald-200">
-                      AI Ready
-                    </Text>
                   </View>
                 </View>
 
                 {/* Highlight Klasifikasi Tanah */}
-                <View className="flex-row items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                  <Layers size={16} color="#059669" />
-                  <View className="flex-1 flex-row items-baseline justify-between">
-                    <Text className="text-xs text-gray-600 dark:text-gray-300 font-medium">
-                      Klasifikasi Tanah:
+                <View className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex-row items-center justify-between">
+                  <View>
+                    <Text className="text-[10px] uppercase font-bold tracking-wider text-emerald-800 dark:text-emerald-200">
+                      Klasifikasi Tanah
                     </Text>
-                    <Text className="text-sm font-extrabold text-emerald-800 dark:text-emerald-200">
+                    <Text className="text-lg font-black text-emerald-950 dark:text-emerald-50">
                       Tanah {data.soilType}
+                    </Text>
+                  </View>
+                  <View className="items-end">
+                    <Text className="text-[10px] uppercase font-bold tracking-wider text-emerald-800 dark:text-emerald-200">
+                      Indeks Kesuburan
+                    </Text>
+                    <Text className="text-lg font-black text-emerald-600 dark:text-emerald-400">
+                      {data.score}
+                      <Text className="text-xs font-semibold text-gray-500">
+                        /100
+                      </Text>
                     </Text>
                   </View>
                 </View>
 
-                <Text className="text-xs text-emerald-950/80 dark:text-emerald-100/80 leading-relaxed">
-                  {data.kesimpulan}
-                </Text>
+                {/* Narasi Kesimpulan */}
+                <View className="gap-1.5">
+                  <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50">
+                    Kesimpulan Agronomi:
+                  </Text>
+                  <Text className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
+                    {data.kesimpulan}
+                  </Text>
+                </View>
 
-                {/* Badges Grid */}
-                <View className="flex-row flex-wrap gap-2 pt-1">
+                {/* Badges Biosfer & Ekologi Tanah */}
+                <View className="flex-row flex-wrap gap-2 pt-1 border-t border-black/5 dark:border-white/5">
                   <View className="flex-1 min-w-[120px] p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5">
                     <Text className="text-[10px] text-gray-500">
-                      Klasifikasi
+                      Status Kualitas
                     </Text>
-                    <Text className="text-xs font-bold text-emerald-700 dark:text-emerald-300 mt-0.5">
-                      {data.soilType}
+                    <Text className="text-xs font-bold text-emerald-800 dark:text-emerald-200 mt-0.5">
+                      {data.statusKualitas}
                     </Text>
                   </View>
 
@@ -516,54 +546,77 @@ export default function AiScreen() {
                 </View>
 
                 <View className="gap-2.5 mt-1">
-                  {(data.tanamanCocok || []).map((crop, i) => (
-                    <View
-                      key={i}
-                      className="p-3 rounded-2xl bg-white/70 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 gap-2"
-                    >
-                      <View className="flex-row justify-between items-start">
-                        <View className="flex-1">
-                          <Text className="text-sm font-bold text-emerald-950 dark:text-emerald-50">
-                            {crop.name}
-                          </Text>
-                          <Text className="text-[11px] italic text-gray-500">
-                            {crop.latin}
-                          </Text>
+                  {(data.tanamanCocok || []).map((crop, i) => {
+                    const plantImgUri = getCropImage(
+                      crop.category,
+                      crop.name,
+                      crop.image,
+                    );
+                    return (
+                      <View
+                        key={i}
+                        className="p-3 rounded-2xl bg-white/70 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 gap-2.5"
+                      >
+                        <View className="flex-row items-center gap-3">
+                          <Image
+                            source={{ uri: plantImgUri }}
+                            contentFit="cover"
+                            transition={200}
+                            className="w-14 h-14 rounded-xl border border-black/5 dark:border-white/10 bg-emerald-100/50 dark:bg-emerald-950/40"
+                          />
+                          <View className="flex-1">
+                            <View className="flex-row justify-between items-start gap-1">
+                              <View className="flex-1 mr-1">
+                                <Text
+                                  className="text-sm font-bold text-emerald-950 dark:text-emerald-50"
+                                  numberOfLines={1}
+                                >
+                                  {crop.name}
+                                </Text>
+                                <Text
+                                  className="text-[11px] italic text-gray-500"
+                                  numberOfLines={1}
+                                >
+                                  {crop.latin}
+                                </Text>
+                              </View>
+
+                              <View
+                                className={`px-2 py-0.5 rounded-full border ${getCropBadgeStyle(
+                                  crop.compatibility,
+                                  crop.badgeColor,
+                                )}`}
+                              >
+                                <Text className="text-[10px] font-bold">
+                                  {crop.compatibility}% {crop.badge}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
                         </View>
 
-                        <View
-                          className={`px-2 py-0.5 rounded-full border ${getCropBadgeStyle(
-                            crop.compatibility,
-                            crop.badgeColor,
-                          )}`}
-                        >
-                          <Text className="text-[10px] font-bold">
-                            {crop.compatibility}% {crop.badge}
-                          </Text>
+                        <Text className="text-xs text-emerald-900/80 dark:text-emerald-200/80 leading-relaxed">
+                          {crop.reason}
+                        </Text>
+
+                        <View className="flex-row items-center gap-3 pt-1 border-t border-black/5 dark:border-white/5">
+                          <View className="flex-row items-center gap-1">
+                            <Calendar size={11} color="#059669" />
+                            <Text className="text-[11px] text-gray-600 dark:text-gray-300 font-medium">
+                              Panen: {crop.cycle}
+                            </Text>
+                          </View>
+
+                          <View className="flex-row items-center gap-1">
+                            <Droplets size={11} color="#0284C7" />
+                            <Text className="text-[11px] text-gray-600 dark:text-gray-300 font-medium">
+                              Air: {crop.waterNeed}
+                            </Text>
+                          </View>
                         </View>
                       </View>
-
-                      <Text className="text-xs text-emerald-900/80 dark:text-emerald-200/80 leading-relaxed">
-                        {crop.reason}
-                      </Text>
-
-                      <View className="flex-row items-center gap-3 pt-1 border-t border-black/5 dark:border-white/5">
-                        <View className="flex-row items-center gap-1">
-                          <Calendar size={11} color="#059669" />
-                          <Text className="text-[11px] text-gray-600 dark:text-gray-300 font-medium">
-                            Panen: {crop.cycle}
-                          </Text>
-                        </View>
-
-                        <View className="flex-row items-center gap-1">
-                          <Droplets size={11} color="#0284C7" />
-                          <Text className="text-[11px] text-gray-600 dark:text-gray-300 font-medium">
-                            Air: {crop.waterNeed}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  ))}
+                    );
+                  })}
                 </View>
               </GlassCard>
 
