@@ -82,6 +82,7 @@ export function getCandidateBaseUrls(ip?: string, port?: string): string[] {
 export async function fetchSoilData(options?: {
   ip?: string;
   port?: string;
+  timeoutMs?: number;
   limit?: number;
 }): Promise<SoilDataRecord[]> {
   const limit = options?.limit ?? 7;
@@ -106,7 +107,8 @@ export async function fetchSoilData(options?: {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error(`HTTP error ${response.status}`);
+        const errJson = await response.json().catch(() => null);
+        throw new Error(errJson?.message || `HTTP error ${response.status}`);
       }
 
       const json: SoilDataApiResponse = await response.json();
@@ -127,6 +129,7 @@ export async function fetchSoilData(options?: {
 export async function fetchCurrentSoilData(options?: {
   ip?: string;
   port?: string;
+  timeoutMs?: number;
 }): Promise<SoilDataRecord | null> {
   const candidates = getCandidateBaseUrls(options?.ip, options?.port);
 
@@ -149,7 +152,8 @@ export async function fetchCurrentSoilData(options?: {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error(`HTTP error ${response.status}`);
+        const errJson = await response.json().catch(() => null);
+        throw new Error(errJson?.message || `HTTP error ${response.status}`);
       }
 
       const json: SoilCurrentDataApiResponse = await response.json();
@@ -331,6 +335,7 @@ export function formatLastUpdated(date: Date): string {
 export async function fetchSoilAiAnalysis(options?: {
   ip?: string;
   port?: string;
+  timeoutMs?: number;
 }): Promise<SoilAiAnalysis | null> {
   const candidates = getCandidateBaseUrls(options?.ip, options?.port);
 
@@ -339,7 +344,8 @@ export async function fetchSoilAiAnalysis(options?: {
   for (const baseUrl of candidates) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const timeoutDuration = options?.timeoutMs ?? 150000;
+      const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
 
       const url = `${baseUrl}/api/v1/ai`;
       const response = await fetch(url, {
@@ -353,7 +359,8 @@ export async function fetchSoilAiAnalysis(options?: {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error(`HTTP error ${response.status}`);
+        const errJson = await response.json().catch(() => null);
+        throw new Error(errJson?.message || `HTTP error ${response.status}`);
       }
 
       const json: SoilAiApiResponse = await response.json();
@@ -365,6 +372,10 @@ export async function fetchSoilAiAnalysis(options?: {
     } catch (err: any) {
       lastError = err;
     }
+  }
+
+  if (lastError) {
+    throw lastError;
   }
 
   return null;
@@ -381,7 +392,7 @@ export async function uploadSoilPhoto(
   for (const baseUrl of candidates) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
 
       const url = `${baseUrl}/api/v1/data/photo`;
       const response = await fetch(url, {

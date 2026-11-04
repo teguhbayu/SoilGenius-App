@@ -63,6 +63,23 @@ function getCropBadgeStyle(compatibility: number, badgeColor?: string) {
 function AiScreenSkeleton() {
   return (
     <View className="gap-4">
+      {/* Banner Status Analisis Sedang Berlangsung */}
+      <GlassCard
+        glowColor="#059669"
+        borderColor="rgba(5, 150, 105, 0.35)"
+        contentClassName="p-4 rounded-[22px] flex-row items-center gap-3 bg-emerald-500/10 dark:bg-emerald-500/15"
+      >
+        <ActivityIndicator size="small" color="#059669" />
+        <View className="flex-1">
+          <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50">
+            Sistem Pakar AI Sedang Menganalisis...
+          </Text>
+          <Text className="text-[10px] text-emerald-800/80 dark:text-emerald-300/80 mt-0.5 leading-relaxed">
+            Mengevaluasi telemetri tanah & visual foto tanaman. Proses ini dapat memakan waktu hingga 2 menit, mohon tunggu...
+          </Text>
+        </View>
+      </GlassCard>
+
       {/* Skeleton Card 1: Kesimpulan & Klasifikasi */}
       <GlassCard
         glowColor="#10B981"
@@ -80,7 +97,7 @@ function AiScreenSkeleton() {
         </View>
 
         {/* Highlight Klasifikasi Tanah */}
-        <Skeleton width="100%" height={42} borderRadius={14} />
+        <Skeleton width="100%" height={56} borderRadius={14} />
 
         {/* Narrative text lines */}
         <View className="gap-2 pt-1">
@@ -90,21 +107,20 @@ function AiScreenSkeleton() {
           <Skeleton width="75%" height={12} borderRadius={4} />
         </View>
 
-        {/* 5 Badges */}
-        <View className="flex-row flex-wrap gap-2 pt-1">
-          {[...Array(5)].map((_, i) => (
-            <View
-              key={i}
-              className="flex-1 min-w-[120px] p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5 gap-1.5"
-            >
-              <Skeleton width={55} height={10} borderRadius={4} />
-              <Skeleton width="80%" height={14} borderRadius={4} />
-            </View>
-          ))}
+        {/* 2 Badges: Status Kualitas & Retensi Air (Matches actual Card 1) */}
+        <View className="flex-row flex-wrap gap-2 pt-1 border-t border-black/5 dark:border-white/5">
+          <View className="flex-1 min-w-[120px] p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5 gap-1.5">
+            <Skeleton width={60} height={10} borderRadius={4} />
+            <Skeleton width="75%" height={14} borderRadius={4} />
+          </View>
+          <View className="flex-1 min-w-[120px] p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5 gap-1.5">
+            <Skeleton width={60} height={10} borderRadius={4} />
+            <Skeleton width="70%" height={14} borderRadius={4} />
+          </View>
         </View>
       </GlassCard>
 
-      {/* Skeleton Card 2: Kualitas Tanah */}
+      {/* Skeleton Card 2: Kualitas Tanah & Skor Dinamis (Matches actual Card 2) */}
       <GlassCard
         glowColor="#059669"
         contentClassName="p-4 rounded-[22px] gap-3"
@@ -118,31 +134,9 @@ function AiScreenSkeleton() {
             </View>
           </View>
           <View className="items-end gap-1">
-            <Skeleton width={50} height={26} borderRadius={6} />
-            <Skeleton width={60} height={10} borderRadius={4} />
+            <Skeleton width={60} height={28} borderRadius={6} />
+            <Skeleton width={50} height={10} borderRadius={4} />
           </View>
-        </View>
-
-        {/* 6 Quality Parameters */}
-        <View className="gap-2 mt-1">
-          {[...Array(6)].map((_, i) => (
-            <View
-              key={i}
-              className="p-2.5 rounded-xl bg-white/70 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 gap-2"
-            >
-              <View className="flex-row justify-between items-center">
-                <View className="gap-1 flex-1 mr-2">
-                  <Skeleton width={130} height={12} borderRadius={4} />
-                  <Skeleton width={90} height={9} borderRadius={3} />
-                </View>
-                <View className="items-end gap-1">
-                  <Skeleton width={45} height={12} borderRadius={4} />
-                  <Skeleton width={55} height={10} borderRadius={4} />
-                </View>
-              </View>
-              <Skeleton width="100%" height={6} borderRadius={3} />
-            </View>
-          ))}
         </View>
       </GlassCard>
 
@@ -239,6 +233,14 @@ export default function AiScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const isMountedRef = React.useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const loadAiData = useCallback(
     async (isManualRefresh = false) => {
       if (isManualRefresh) {
@@ -248,29 +250,50 @@ export default function AiScreen() {
       }
       setErrorMessage(null);
 
-      try {
-        const result = await fetchSoilAiAnalysis({
-          ip: config.apiServerIp,
-          port: config.apiServerPort,
-        });
+      // Allow up to 3 attempts with progressive delay if analysis is currently in progress
+      const maxAttempts = 3;
+      let attempt = 0;
+      let lastErr: any = null;
 
-        if (result) {
-          setData(result);
-        } else {
-          setErrorMessage(
-            "Belum ada data analisis AI. Ambil foto tanah terlebih dahulu pada menu Kamera.",
-          );
+      while (attempt < maxAttempts) {
+        if (!isMountedRef.current) return;
+        attempt++;
+
+        try {
+          const result = await fetchSoilAiAnalysis({
+            ip: config.apiServerIp,
+            port: config.apiServerPort,
+            timeoutMs: 150000,
+          });
+
+          if (!isMountedRef.current) return;
+
+          if (result) {
+            setData(result);
+            setErrorMessage(null);
+            setIsLoading(false);
+            setIsRefreshing(false);
+            return;
+          }
+        } catch (err: any) {
+          lastErr = err;
+          console.warn(`[AI] Attempt ${attempt} failed:`, err?.message || err);
         }
-      } catch (err: any) {
-        const msg =
-          err?.message ||
-          "Gagal mengambil hasil analisis AI. Pastikan server API aktif.";
-        setErrorMessage(msg);
-        toast.error(msg);
-      } finally {
-        setIsLoading(false);
-        setIsRefreshing(false);
+
+        if (attempt < maxAttempts && isMountedRef.current) {
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+        }
       }
+
+      if (!isMountedRef.current) return;
+
+      const msg =
+        lastErr?.message ||
+        "Belum ada data analisis AI. Ambil foto tanah terlebih dahulu pada menu Kamera.";
+      setErrorMessage(msg);
+      toast.error(msg);
+      setIsLoading(false);
+      setIsRefreshing(false);
     },
     [config.apiServerIp, config.apiServerPort, toast],
   );
