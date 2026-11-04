@@ -648,16 +648,7 @@ export default function DashboardScreen() {
                 </View>
               </View>
 
-              {isLoading ? (
-                <Skeleton width={80} height={22} borderRadius={8} />
-              ) : (
-                <View className="flex-row items-center gap-1 bg-emerald-100 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg">
-                  <TrendingUp size={12} color="#059669" />
-                  <Text className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
-                    {metric.statusLabel}
-                  </Text>
-                </View>
-              )}
+             
             </View>
 
             <View className="flex-row gap-1.5 p-1 rounded-xl bg-black/[0.03] dark:bg-white/[0.04]">

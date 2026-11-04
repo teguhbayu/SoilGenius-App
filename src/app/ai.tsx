@@ -469,24 +469,6 @@ export default function AiScreen() {
                       {data.retensiAir}
                     </Text>
                   </View>
-
-                  <View className="flex-1 min-w-[120px] p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5">
-                    <Text className="text-[10px] text-gray-500">
-                      Tingkat Salinitas
-                    </Text>
-                    <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50 mt-0.5">
-                      {data.tingkatSalinitas}
-                    </Text>
-                  </View>
-
-                  <View className="flex-1 min-w-[120px] p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5">
-                    <Text className="text-[10px] text-gray-500">
-                      Risiko Penyakit
-                    </Text>
-                    <Text className="text-xs font-bold text-emerald-700 dark:text-emerald-300 mt-0.5">
-                      {data.risikoPenyakit}
-                    </Text>
-                  </View>
                 </View>
               </GlassCard>
 

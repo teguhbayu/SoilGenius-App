@@ -18,7 +18,7 @@ export function SettingsHeader({ onReset }: SettingsHeaderProps) {
   const handleResetPress = () => {
     Alert.alert(
       'Reset Konfigurasi',
-      'Kembalikan pengaturan Server IP dan MQTT Channel ke nilai default?',
+      'Kembalikan pengaturan Server API ke nilai default?',
       [
         { text: 'Batal', style: 'cancel' },
         { text: 'Reset', style: 'destructive', onPress: onReset },
@@ -40,7 +40,7 @@ export function SettingsHeader({ onReset }: SettingsHeaderProps) {
             Konfigurasi
           </Text>
           <Text className="text-xs text-emerald-800/70 dark:text-emerald-300/70">
-            Server & MQTT Broker
+            Endpoint REST API
           </Text>
         </View>
       </View>

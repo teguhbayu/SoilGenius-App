@@ -59,7 +59,6 @@ export async function registerForPushNotificationsAsync(): Promise<boolean> {
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#10B981',
-        sound: 'default',
         showBadge: true,
       });
     }
@@ -111,7 +110,7 @@ export async function sendSoilDataNotification(data: SoilDataRecord): Promise<vo
           skor: data.skor,
           url: '/(tabs)',
         },
-        sound: 'default',
+        sound: true,
       },
       trigger: Platform.OS === 'android' ? { channelId: NOTIFICATION_CHANNEL_ID } : null,
     });

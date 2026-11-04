@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, ScrollView, Pressable, Text } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Cpu, ChevronRight, Sliders } from 'lucide-react-native';
+import { Cpu, ChevronRight } from 'lucide-react-native';
 import { SafeAreaView } from '@/components/ui/styled';
 import { MeshBackground } from '@/components/ui/mesh-background';
 import { GlassCard } from '@/components/ui/glass-card';
@@ -12,8 +12,6 @@ import { useToast } from '@/hooks/use-toast';
 import { SettingsHeader } from '@/components/settings/settings-header';
 import { ConfigSummaryCard } from '@/components/settings/config-summary-card';
 import { ApiServerConfigCard } from '@/components/settings/api-server-config-card';
-import { ServerConfigCard } from '@/components/settings/server-config-card';
-import { MqttConfigCard } from '@/components/settings/mqtt-config-card';
 import { NotificationConfigCard } from '@/components/settings/notification-config-card';
 import { ThemeConfigCard } from '@/components/settings/theme-config-card';
 import { SaveConfigButton } from '@/components/settings/save-config-button';
@@ -35,7 +33,7 @@ function SettingsScreenSkeleton() {
         </View>
       </GlassCard>
 
-      {[...Array(3)].map((_, i) => (
+      {[...Array(2)].map((_, i) => (
         <GlassCard key={i} glowColor="#10B981" contentClassName="p-4 rounded-[20px] gap-3">
           <View className="flex-row items-center gap-2">
             <Skeleton width={26} height={26} borderRadius={8} />
@@ -61,17 +59,11 @@ export default function SettingsScreen() {
     config,
     apiServerIp,
     apiServerPort,
-    serverIp,
-    serverPort,
-    mqttChannel,
     isLoading,
     isSaving,
     isSaved,
     setApiServerIp,
     setApiServerPort,
-    setServerIp,
-    setServerPort,
-    setMqttChannel,
     saveConfig,
     resetToDefault,
   } = useSettings();
@@ -82,7 +74,7 @@ export default function SettingsScreen() {
   const handleSave = async () => {
     try {
       await saveConfig();
-      toast.success("Konfigurasi berhasil disimpan!");
+      toast.success("Konfigurasi server berhasil disimpan!");
     } catch (err: any) {
       toast.error(err?.message || "Gagal menyimpan konfigurasi");
     }
@@ -151,18 +143,6 @@ export default function SettingsScreen() {
                 apiServerPort={apiServerPort}
                 onChangeIp={setApiServerIp}
                 onChangePort={setApiServerPort}
-              />
-
-              <ServerConfigCard
-                serverIp={serverIp}
-                serverPort={serverPort}
-                onChangeIp={setServerIp}
-                onChangePort={setServerPort}
-              />
-
-              <MqttConfigCard
-                channel={mqttChannel}
-                onChangeChannel={setMqttChannel}
               />
 
               <ThemeConfigCard

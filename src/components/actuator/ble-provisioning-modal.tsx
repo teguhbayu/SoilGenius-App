@@ -262,12 +262,12 @@ export function BleProvisioningModal({
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        className="flex-1 bg-black/60 items-center justify-center p-4"
+        className="flex-1 bg-black/60 items-center justify-center p-4 sm:p-6"
       >
         <GlassCard
           glowColor="#10B981"
           borderColor="rgba(16, 185, 129, 0.4)"
-          contentClassName="p-4 sm:p-5 rounded-[28px] max-w-[440px] w-full gap-3.5 max-h-[88vh]"
+          contentClassName="p-4 sm:p-5 rounded-[28px] max-w-[440px] w-full gap-3.5 max-h-[85vh]"
         >
           {/* Header Modal */}
           <View className="flex-row items-center justify-between border-b border-black/5 dark:border-white/10 pb-3">
@@ -304,7 +304,7 @@ export function BleProvisioningModal({
 
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerClassName="gap-3.5 pb-2"
+            contentContainerClassName="gap-3.5 pb-6 pt-1 px-1"
             keyboardShouldPersistTaps="handled"
           >
 
@@ -392,23 +392,31 @@ export function BleProvisioningModal({
                         <Pressable
                           key={dev.id}
                           onPress={() => handleSelectDiscoveredDevice(dev)}
-                          className="p-3 rounded-2xl bg-white/80 dark:bg-white/[0.06] border border-emerald-500/30 flex-row items-center justify-between active:opacity-70"
+                          className="p-3 rounded-2xl bg-white/80 dark:bg-white/[0.06] border border-emerald-500/30 flex-row items-center justify-between active:opacity-70 gap-2"
                         >
-                          <View className="flex-row items-center gap-3 flex-1 pr-2">
-                            <View className="w-9 h-9 rounded-xl items-center justify-center bg-emerald-500/15">
+                          <View className="flex-row items-center gap-2.5 flex-1 min-w-0 pr-1">
+                            <View className="w-9 h-9 rounded-xl items-center justify-center bg-emerald-500/15 shrink-0">
                               <Radio size={16} color="#059669" />
                             </View>
-                            <View className="flex-1">
-                              <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50">
+                            <View className="flex-1 min-w-0">
+                              <Text
+                                className="text-xs font-bold text-emerald-950 dark:text-emerald-50"
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                              >
                                 {dev.name}
                               </Text>
-                              <Text className="text-[10px] font-mono text-gray-500">
+                              <Text
+                                className="text-[10px] font-mono text-gray-500"
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                              >
                                 ID: {derivedId}
                               </Text>
                             </View>
                           </View>
 
-                          <View className="flex-row items-center gap-2">
+                          <View className="flex-row items-center gap-2 shrink-0">
                             {dev.rssi && (
                               <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15">
                                 <Signal size={10} color="#059669" />
@@ -474,16 +482,24 @@ export function BleProvisioningModal({
           {step === 'credentials' && selectedDevice && (
             <View className="gap-3">
               {/* Badge Perangkat Terpilih */}
-              <View className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex-row items-center justify-between">
-                <View className="flex-row items-center gap-2.5 flex-1 pr-2">
-                  <View className="w-8 h-8 rounded-xl bg-emerald-600 items-center justify-center">
+              <View className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex-row items-center justify-between gap-2">
+                <View className="flex-row items-center gap-2.5 flex-1 min-w-0 pr-1">
+                  <View className="w-8 h-8 rounded-xl bg-emerald-600 items-center justify-center shrink-0">
                     <Radio size={16} color="#FFFFFF" />
                   </View>
-                  <View className="flex-1">
-                    <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-50">
+                  <View className="flex-1 min-w-0">
+                    <Text
+                      className="text-xs font-bold text-emerald-950 dark:text-emerald-50"
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
                       {selectedDevice.name}
                     </Text>
-                    <Text className="text-[10px] font-mono text-emerald-800 dark:text-emerald-300">
+                    <Text
+                      className="text-[10px] font-mono text-emerald-800 dark:text-emerald-300"
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
                       ID: {deriveDeviceIdFromBleName(selectedDevice.name || selectedDevice.id)}
                     </Text>
                   </View>
@@ -491,7 +507,7 @@ export function BleProvisioningModal({
 
                 <Pressable
                   onPress={() => setStep('scan')}
-                  className="px-2 py-1 rounded-lg bg-black/5 dark:bg-white/10 flex-row items-center gap-1 active:opacity-70"
+                  className="px-2.5 py-1.5 rounded-lg bg-black/5 dark:bg-white/10 flex-row items-center gap-1 active:opacity-70 shrink-0"
                 >
                   <Edit3 size={11} color={isDark ? '#9CA3AF' : '#4B5563'} />
                   <Text className="text-[10px] font-bold text-gray-700 dark:text-gray-300">
@@ -509,7 +525,7 @@ export function BleProvisioningModal({
                 <Text className="text-[11px] font-bold text-gray-700 dark:text-gray-300">
                   Nama Wi-Fi (SSID):
                 </Text>
-                <View className="flex-row items-center px-3 py-2 rounded-xl bg-white/80 dark:bg-white/[0.06] border border-black/10 dark:border-white/10 gap-2">
+                <View className="flex-row items-center px-3.5 py-2.5 rounded-xl bg-white/80 dark:bg-white/[0.06] border border-black/10 dark:border-white/10 gap-2.5 min-h-[44px]">
                   <Wifi size={14} color="#059669" />
                   <TextInput
                     value={wifiSsid}
@@ -525,7 +541,7 @@ export function BleProvisioningModal({
                 <Text className="text-[11px] font-bold text-gray-700 dark:text-gray-300">
                   Kata Sandi Wi-Fi:
                 </Text>
-                <View className="flex-row items-center px-3 py-2 rounded-xl bg-white/80 dark:bg-white/[0.06] border border-black/10 dark:border-white/10 gap-2">
+                <View className="flex-row items-center px-3.5 py-2.5 rounded-xl bg-white/80 dark:bg-white/[0.06] border border-black/10 dark:border-white/10 gap-2.5 min-h-[44px]">
                   <Key size={14} color="#059669" />
                   <TextInput
                     value={wifiPassword}
@@ -544,10 +560,10 @@ export function BleProvisioningModal({
                 </Text>
               )}
 
-              <View className="flex-row gap-2 pt-1">
+              <View className="flex-row gap-2.5 pt-2">
                 <Pressable
                   onPress={() => setStep('scan')}
-                  className="flex-1 py-2.5 rounded-xl border border-black/10 dark:border-white/15 items-center justify-center"
+                  className="flex-1 py-3 rounded-xl border border-black/10 dark:border-white/15 items-center justify-center min-h-[44px]"
                 >
                   <Text className="text-xs font-bold text-gray-600 dark:text-gray-300">
                     Kembali
@@ -556,7 +572,7 @@ export function BleProvisioningModal({
 
                 <Pressable
                   onPress={handleExecuteProvisioning}
-                  className="flex-[1.6] py-2.5 rounded-xl bg-emerald-600 items-center justify-center active:opacity-85 shadow-sm"
+                  className="flex-[1.6] py-3 rounded-xl bg-emerald-600 items-center justify-center active:opacity-85 shadow-sm min-h-[44px]"
                 >
                   <Text className="text-xs font-bold text-white">
                     Kirim & Pasangkan
@@ -568,13 +584,13 @@ export function BleProvisioningModal({
 
           {/* STEP 3: Proses Provisioning Berjalan */}
           {step === 'provisioning' && (
-            <View className="py-6 items-center justify-center gap-3">
+            <View className="py-7 items-center justify-center gap-3">
               <ActivityIndicator size="large" color="#059669" />
               <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-100 text-center">
                 {provStatusMessage}
               </Text>
               <Text className="text-[10px] text-gray-500 text-center max-w-[280px]">
-                Mengirim kredensial via Bluetooth LE dan mengaitkan node dengan antrean MQTT Server Hub.
+                Mengirim kredensial via Bluetooth LE dan mendaftarkan node ke Server Hub.
               </Text>
             </View>
           )}
